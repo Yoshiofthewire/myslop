@@ -17,8 +17,12 @@ from handoff import clock
 
 SESSION_TTL = 30 * 86400
 COOKIE_NAME = "handoff_session"
+MAX_USERNAME_LEN = 64
 
 _ph = PasswordHasher()
+# Verified on every login attempt for an unknown/passwordless username, so that path
+# pays the same argon2 cost as a real one and can't be used to enumerate accounts.
+_DUMMY_HASH = _ph.hash("handoff-dummy-password-for-constant-time-login")
 
 # username -> (consecutive failures, unix time when attempts may resume)
 _throttle: dict[str, tuple[int, int]] = {}
@@ -55,6 +59,10 @@ def agent_by_token(conn: sqlite3.Connection, token: str) -> sqlite3.Row | None:
     row = conn.execute(
         "SELECT * FROM agents WHERE token_hash = ? AND revoked_at IS NULL", (digest,)
     ).fetchone()
+    # The SQL lookup above is an indexed equality match, not constant-time -- this
+    # compare doesn't make the lookup itself timing-safe. Kept anyway per spec: the
+    # compared value is a sha256 digest of attacker-supplied input, so any timing
+    # signal about digest proximity gives no preimage advantage.
     if row is None or not hmac.compare_digest(row["token_hash"], digest):
         return None
     return row
@@ -70,6 +78,8 @@ def list_agents(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 
 def create_user(conn: sqlite3.Connection, username: str, password: str) -> int:
+    if len(username) > MAX_USERNAME_LEN:
+        raise ValueError(f"username exceeds {MAX_USERNAME_LEN} characters")
     cur = conn.execute(
         "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
         (username, _ph.hash(password), clock.now()),
@@ -79,6 +89,9 @@ def create_user(conn: sqlite3.Connection, username: str, password: str) -> int:
 
 
 def verify_user(conn: sqlite3.Connection, username: str, password: str) -> sqlite3.Row | None:
+    if len(username) > MAX_USERNAME_LEN:
+        return None
+
     failures, resume_at = _throttle.get(username, (0, 0))
     if clock.now() < resume_at:
         return None
@@ -90,6 +103,13 @@ def verify_user(conn: sqlite3.Connection, username: str, password: str) -> sqlit
             ok = _ph.verify(row["password_hash"], password)
         except VerifyMismatchError:
             ok = False
+    else:
+        # No such user (or no password set): still pay the argon2 cost, so an
+        # unknown username can't be distinguished from a wrong password by timing.
+        try:
+            _ph.verify(_DUMMY_HASH, password)
+        except VerifyMismatchError:
+            pass
 
     if not ok:
         failures += 1

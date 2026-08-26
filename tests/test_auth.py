@@ -98,3 +98,47 @@ def test_csrf_token_is_bound_to_the_session(conn):
     assert auth.check_csrf("session-a", a)
     assert not auth.check_csrf("session-a", b)
     assert not auth.check_csrf("session-a", "")
+
+
+class _SpyHasher:
+    """Wraps the real PasswordHasher to count verify() calls. argon2-cffi's
+    PasswordHasher has read-only attributes, so its methods can't be monkeypatched
+    directly -- replace the module-level `_ph` reference instead."""
+
+    def __init__(self, real):
+        self._real = real
+        self.calls = []
+
+    def verify(self, *args, **kwargs):
+        self.calls.append(args)
+        return self._real.verify(*args, **kwargs)
+
+
+def test_verify_user_reaches_argon2_for_unknown_username_too(conn, monkeypatch):
+    """Wrong password and unknown username must pay the same argon2 cost, or the
+    response time leaks whether an account exists."""
+    auth.create_user(conn, "yoshi", "hunter2")
+    auth.reset_throttle()
+
+    spy = _SpyHasher(auth._ph)
+    monkeypatch.setattr(auth, "_ph", spy)
+
+    assert auth.verify_user(conn, "yoshi", "wrong") is None
+    assert len(spy.calls) == 1
+
+    spy.calls.clear()
+    assert auth.verify_user(conn, "nobody", "wrong") is None
+    assert len(spy.calls) == 1
+
+
+def test_create_user_rejects_overlong_username(conn):
+    with pytest.raises(ValueError):
+        auth.create_user(conn, "a" * 65, "hunter2")
+
+
+def test_verify_user_rejects_overlong_username_without_touching_throttle(conn):
+    auth.reset_throttle()
+    long_username = "a" * 65
+
+    assert auth.verify_user(conn, long_username, "hunter2") is None
+    assert long_username not in auth._throttle
