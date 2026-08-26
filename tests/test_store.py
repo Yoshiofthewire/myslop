@@ -233,6 +233,48 @@ def test_add_post_resolves_distinct_filenames_to_distinct_blobs(conn):
     assert f'src="/f/s/blob/{blobs["dog.png"]}"' in html
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        "../../etc/passwd",
+        "a b;c.png",
+        "café.png",
+        "a" * 100,
+        "a" * 63 + "-" + "b" * 20 + ".png",
+        "---",
+        ".hidden",
+        "a" * 64 + "-" * 10,
+    ],
+)
+def test_safe_filename_is_idempotent(name):
+    once = store.safe_filename(name)
+    assert store.safe_filename(once) == once
+
+
+def test_add_post_rejects_a_name_that_sanitizes_to_a_prior_raw_name(conn):
+    # Truncation exposes a trailing hyphen that a second sanitize pass would
+    # strip, so safe_filename(raw1) is not stable under re-sanitizing unless
+    # safe_filename itself is idempotent. raw2 is exactly raw1's sanitized
+    # form, so it must not be allowed to alias raw1's blob_urls entry.
+    raw1 = "a" * 63 + "-" + "b" * 20 + ".png"
+    raw2 = store.safe_filename(raw1)
+
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn,
+            "s",
+            "opus",
+            "agent",
+            "T",
+            "md",
+            "x",
+            images=[(raw1, PNG), (raw2, JPEG)],
+            ttl_days=7,
+        )
+
+
 def test_recreating_an_expired_slug_does_not_resurrect_its_posts(conn, monkeypatch):
     t = [1000]
     monkeypatch.setattr(clock, "now", lambda: t[0])

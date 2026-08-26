@@ -45,10 +45,14 @@ def sniff_mime(data: bytes) -> str | None:
 
 
 def safe_filename(name: str) -> str:
-    """Reduce a client-supplied name to a bare, substitution-safe filename."""
+    """Reduce a client-supplied name to a bare, substitution-safe filename.
+
+    Idempotent: truncating before stripping means a stray hyphen exposed by
+    the cut is removed, not left for a second pass to find.
+    """
     base = name.replace("\\", "/").rsplit("/", 1)[-1]
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", base).strip("-")
-    return cleaned[:64] or "file"
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", base)
+    return cleaned[:64].strip("-") or "file"
 
 
 def create_folder(conn: sqlite3.Connection, slug: str, title: str, ttl_days: int) -> sqlite3.Row:
@@ -122,7 +126,6 @@ def add_post(
     # known at render time and the post row is written complete, in one transaction.
     prepared = []
     blob_urls = {}
-    seen_names = set()
     for raw_name, data in images:
         if len(data) > MAX_IMAGE_BYTES:
             raise Invalid(f"image too large: {raw_name}")
@@ -130,9 +133,8 @@ def add_post(
         if mime is None:
             raise Invalid(f"not an allowed image type: {raw_name}")
         name = safe_filename(raw_name)
-        if name in seen_names:
-            raise Invalid(f"duplicate image filename: {name}")
-        seen_names.add(name)
+        if name in blob_urls or raw_name in blob_urls:
+            raise Invalid(f"duplicate image filename: {raw_name}")
         blob_id = secrets.token_hex(16)
         prepared.append((blob_id, name, mime, data))
         blob_urls[name] = f"/f/{slug}/blob/{blob_id}"
