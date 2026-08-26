@@ -16,8 +16,20 @@ def test_valid_slugs_accepted(slug):
 
 @pytest.mark.parametrize(
     "slug",
-    ["", "-leading", "UPPER", "has space", "has_underscore", "../etc/passwd",
-     "/absolute", "a/b", "x" * 65, "café", "a.b", "dot."],
+    [
+        "",
+        "-leading",
+        "UPPER",
+        "has space",
+        "has_underscore",
+        "../etc/passwd",
+        "/absolute",
+        "a/b",
+        "x" * 65,
+        "café",
+        "a.b",
+        "dot.",
+    ],
 )
 def test_invalid_slugs_rejected(slug):
     assert not store.valid_slug(slug)
@@ -100,8 +112,15 @@ def test_add_post_sanitizes(conn):
 def test_add_post_stores_images_and_resolves_references(conn):
     store.create_folder(conn, "s", "S", 7)
     pid = store.add_post(
-        conn, "s", "opus", "agent", "T", "md", "![a](img:arch.png)",
-        images=[("arch.png", PNG)], ttl_days=7,
+        conn,
+        "s",
+        "opus",
+        "agent",
+        "T",
+        "md",
+        "![a](img:arch.png)",
+        images=[("arch.png", PNG)],
+        ttl_days=7,
     )
 
     blob = conn.execute("SELECT * FROM blobs WHERE post_id = ?", (pid,)).fetchone()
@@ -116,8 +135,15 @@ def test_add_post_rejects_a_png_that_is_actually_html(conn):
     store.create_folder(conn, "s", "S", 7)
     with pytest.raises(store.Invalid):
         store.add_post(
-            conn, "s", "opus", "agent", "T", "md", "x",
-            images=[("evil.png", b"<html><script>alert(1)</script></html>")], ttl_days=7,
+            conn,
+            "s",
+            "opus",
+            "agent",
+            "T",
+            "md",
+            "x",
+            images=[("evil.png", b"<html><script>alert(1)</script></html>")],
+            ttl_days=7,
         )
 
 
@@ -159,19 +185,69 @@ def test_set_status_updates_status_and_owner(conn):
 def test_blob_is_scoped_to_its_folder(conn):
     store.create_folder(conn, "a", "A", 7)
     store.create_folder(conn, "b", "B", 7)
-    store.add_post(conn, "a", "opus", "agent", "T", "md", "x",
-                   images=[("i.png", PNG)], ttl_days=7)
+    store.add_post(conn, "a", "opus", "agent", "T", "md", "x", images=[("i.png", PNG)], ttl_days=7)
     blob_id = conn.execute("SELECT id FROM blobs").fetchone()["id"]
 
     assert store.get_blob(conn, "a", blob_id) is not None
     assert store.get_blob(conn, "b", blob_id) is None
 
 
+def test_add_post_rejects_colliding_sanitized_filenames(conn):
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn,
+            "s",
+            "opus",
+            "agent",
+            "T",
+            "md",
+            "![a](img:a-b.png) and ![b](img:a b.png)",
+            images=[("a-b.png", PNG), ("a b.png", JPEG)],
+            ttl_days=7,
+        )
+
+
+def test_add_post_resolves_distinct_filenames_to_distinct_blobs(conn):
+    store.create_folder(conn, "s", "S", 7)
+    pid = store.add_post(
+        conn,
+        "s",
+        "opus",
+        "agent",
+        "T",
+        "md",
+        "![a](img:cat.png) and ![b](img:dog.png)",
+        images=[("cat.png", PNG), ("dog.png", JPEG)],
+        ttl_days=7,
+    )
+
+    blobs = {
+        b["filename"]: b["id"]
+        for b in conn.execute("SELECT * FROM blobs WHERE post_id = ?", (pid,)).fetchall()
+    }
+    assert len(blobs) == 2
+
+    html = conn.execute("SELECT html FROM posts WHERE id = ?", (pid,)).fetchone()["html"]
+    assert f'src="/f/s/blob/{blobs["cat.png"]}"' in html
+    assert f'src="/f/s/blob/{blobs["dog.png"]}"' in html
+
+
 def test_recreating_an_expired_slug_does_not_resurrect_its_posts(conn, monkeypatch):
     t = [1000]
     monkeypatch.setattr(clock, "now", lambda: t[0])
     store.create_folder(conn, "s", "S", 7)
-    store.add_post(conn, "s", "opus", "agent", "old", "md", "secret from the dead", ttl_days=7)
+    store.add_post(
+        conn,
+        "s",
+        "opus",
+        "agent",
+        "old",
+        "md",
+        "secret from the dead",
+        images=[("evidence.png", PNG)],
+        ttl_days=7,
+    )
 
     t[0] = 1000 + 8 * DAY
     store.create_folder(conn, "s", "S again", 7)
