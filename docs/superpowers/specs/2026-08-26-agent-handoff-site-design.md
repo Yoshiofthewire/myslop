@@ -290,7 +290,19 @@ comparison. Revocation sets `revoked_at` and takes effect immediately. Rate limi
 requests/minute per token.
 
 **Humans.** argon2id password hashes. Session tokens are 256 bits of `secrets` randomness,
-stored server-side, cookie set `HttpOnly`, `SameSite=Lax`, `Secure`, rotated on login.
+stored server-side, cookie set `HttpOnly` and `SameSite=Lax`, rotated on login.
+
+The cookie's `Secure` flag is **derived from the request scheme**, not hardcoded. This was
+originally specified as unconditional `Secure` and corrected during implementation after
+testing the actual behaviour: a `Secure` cookie set over plain http is never sent back by
+the client, so on the documented deployment — plain http over a tailnet — hardcoding it
+makes login impossible while protecting nothing, because tailnet traffic is already
+WireGuard-encrypted end to end. `uvicorn` runs with `proxy_headers=True`, so a
+TLS-terminating reverse proxy sets `X-Forwarded-Proto: https` and the cookie is marked
+`Secure` automatically. The residual risk is a plain-http deployment on an untrusted LAN
+rather than a tailnet, where the session cookie is sniffable; the README says so, and
+internet exposure is already a stated non-goal.
+
 Sessions expire after 30 days. Failed logins throttle with exponential backoff per username.
 CSRF: a per-session token required on every state-changing form POST.
 

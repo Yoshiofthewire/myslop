@@ -23,6 +23,7 @@ Every task's requirements implicitly include this section.
 - **Never trust the client for:** post author, image MIME type, image filename, or folder existence. Each is derived or validated server-side.
 - **Only `render.render()` may produce a value stored in `posts.html`.** No other code path writes that column.
 - **The service never binds `0.0.0.0`.** Default bind is `127.0.0.1`.
+- **The session cookie is always `HttpOnly` and `SameSite=Lax`; its `Secure` flag is derived from `request.url.scheme == "https"`, never hardcoded.** Verified behaviour: a `Secure` cookie set over plain http is never sent back, so hardcoding it makes login impossible on the documented plain-http tailnet deployment while protecting nothing (tailnet traffic is already WireGuard-encrypted). `uvicorn` runs with `proxy_headers=True` so a TLS-terminating proxy still yields `Secure`.
 - **Slug format:** `^[a-z0-9][a-z0-9-]{0,63}$`, exact.
 - **Statuses:** exactly `open`, `claimed`, `blocked`, `done`.
 - **Default TTL:** 7 days, from `HANDOFF_TTL_DAYS`, threaded explicitly as a `ttl_days: int` parameter — never read from the environment below the app factory.
@@ -1849,11 +1850,15 @@ def test_index_redirects_when_logged_out(client):
     assert r.headers["location"] == "/login"
 
 
-def test_login_sets_a_hardened_cookie(client, db_path):
+def _make_user(db_path):
     c = db.connect(db_path)
     auth.create_user(c, "yoshi", "hunter2")
     c.close()
     auth.reset_throttle()
+
+
+def test_login_sets_a_hardened_cookie(client, db_path):
+    _make_user(db_path)
 
     r = client.post("/login", data={"username": "yoshi", "password": "hunter2"},
                     follow_redirects=False)
@@ -1861,7 +1866,29 @@ def test_login_sets_a_hardened_cookie(client, db_path):
     cookie = r.headers["set-cookie"].lower()
     assert "httponly" in cookie
     assert "samesite=lax" in cookie
-    assert "secure" in cookie
+
+
+def test_cookie_is_secure_under_tls(db_path):
+    from fastapi.testclient import TestClient
+
+    from handoff import app as app_module
+
+    _make_user(db_path)
+    with TestClient(app_module.create_app(db_path), base_url="https://testserver") as tls:
+        r = tls.post("/login", data={"username": "yoshi", "password": "hunter2"},
+                     follow_redirects=False)
+    assert "secure" in r.headers["set-cookie"].lower()
+
+
+def test_cookie_is_not_secure_over_plain_http(client, db_path):
+    # Verified against httpx/TestClient: a Secure cookie set over http is never sent back,
+    # exactly as a browser behaves. Marking it Secure on the documented plain-http tailnet
+    # deployment would not harden the session -- it would make login impossible.
+    _make_user(db_path)
+
+    r = client.post("/login", data={"username": "yoshi", "password": "hunter2"},
+                    follow_redirects=False)
+    assert "secure" not in r.headers["set-cookie"].lower()
 
 
 def test_bad_password_does_not_log_in(client, db_path):
@@ -2017,7 +2044,13 @@ def login(
     sid = auth.create_session(conn, user["id"])
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
-        auth.COOKIE_NAME, sid, httponly=True, samesite="lax", secure=True,
+        auth.COOKIE_NAME, sid, httponly=True, samesite="lax",
+        # Secure whenever TLS is actually in play -- including behind a terminating proxy,
+        # because uvicorn runs with proxy_headers=True and honours X-Forwarded-Proto.
+        # Over plain http a Secure cookie is simply never sent back, so hardcoding it
+        # would break login on the documented tailnet deployment while protecting nothing
+        # (tailnet traffic is already WireGuard-encrypted).
+        secure=request.url.scheme == "https",
         max_age=auth.SESSION_TTL, path="/",
     )
     return response
@@ -2055,7 +2088,7 @@ In `src/handoff/app.py`, inside `create_app`, after the existing handlers:
 - [ ] **Step 6: Run the tests**
 
 Run: `.venv/bin/pytest tests/test_web_auth.py -v`
-Expected: FAIL on the four tests that need `GET /` — it does not exist yet. `test_login_page_renders`, `test_login_sets_a_hardened_cookie`, `test_bad_password_does_not_log_in`, and `test_logout_without_csrf_is_rejected` must pass.
+Expected: FAIL only on the four tests that need `GET /`, which does not exist yet — `test_index_redirects_when_logged_out`, `test_logged_in_user_reaches_the_index`, `test_logout_clears_the_session`, and `test_no_page_contains_a_script_tag`. The other six must pass: `test_login_page_renders`, `test_login_sets_a_hardened_cookie`, `test_cookie_is_secure_under_tls`, `test_cookie_is_not_secure_over_plain_http`, `test_bad_password_does_not_log_in`, `test_logout_without_csrf_is_rejected`.
 
 - [ ] **Step 7: Add a minimal `GET /` so the remaining tests pass**
 
@@ -2077,7 +2110,7 @@ And `src/handoff/templates/index.html`:
 - [ ] **Step 8: Run the tests to verify they pass**
 
 Run: `.venv/bin/pytest tests/test_web_auth.py -v`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 9: Commit**
 
@@ -2776,23 +2809,27 @@ git commit -m "feat: agent token administration UI"
 `tests/test_cli.py`:
 
 ```python
-import pytest
-
 from handoff import auth, cli, db
 
+# Must be at least MIN_PASSWORD_LEN (12) or createuser rejects it before doing anything.
+GOOD = "correct horse battery staple"
+ALSO_GOOD = "a different long passphrase"
 
-def test_createuser_creates_a_user(db_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": "hunter2")
+
+def test_createuser_creates_a_user(db_path, monkeypatch):
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": GOOD)
     assert cli.main(["--db", db_path, "createuser", "yoshi"]) == 0
 
     c = db.connect(db_path)
     auth.reset_throttle()
-    assert auth.verify_user(c, "yoshi", "hunter2") is not None
+    assert auth.verify_user(c, "yoshi", GOOD) is not None
     c.close()
 
 
 def test_createuser_rejects_a_mismatched_confirmation(db_path, monkeypatch):
-    answers = iter(["hunter2", "hunter3"])
+    # Both answers clear the length check, so this exercises the mismatch branch itself
+    # rather than short-circuiting on length.
+    answers = iter([GOOD, ALSO_GOOD])
     monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": next(answers))
     assert cli.main(["--db", db_path, "createuser", "yoshi"]) == 1
 
@@ -2803,7 +2840,7 @@ def test_createuser_rejects_a_mismatched_confirmation(db_path, monkeypatch):
 
 
 def test_createuser_rejects_a_duplicate_username(db_path, monkeypatch):
-    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": "hunter2")
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": GOOD)
     assert cli.main(["--db", db_path, "createuser", "yoshi"]) == 0
     assert cli.main(["--db", db_path, "createuser", "yoshi"]) == 1
 
@@ -2830,8 +2867,8 @@ def test_serve_never_defaults_to_all_interfaces():
 
 
 def test_bind_to_all_interfaces_is_refused(db_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": "hunter2")
-    cli.main(["--db", db_path, "createuser", "yoshi"])
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt="": GOOD)
+    assert cli.main(["--db", db_path, "createuser", "yoshi"]) == 0
 
     assert cli.main(["--db", db_path, "serve", "--bind", "0.0.0.0"]) == 1
     assert "0.0.0.0" in capsys.readouterr().err
@@ -2917,7 +2954,12 @@ def _serve(db_path: str, ttl_days: int, bind: str, port: int, conn: sqlite3.Conn
 
     from handoff.app import create_app
 
-    uvicorn.run(create_app(db_path, ttl_days), host=bind, port=port)
+    # proxy_headers honours X-Forwarded-Proto, so a TLS-terminating reverse proxy makes
+    # request.url.scheme == "https" and the session cookie comes back marked Secure.
+    uvicorn.run(
+        create_app(db_path, ttl_days), host=bind, port=port,
+        proxy_headers=True, forwarded_allow_ips="127.0.0.1",
+    )
     return 0
 
 
@@ -2956,7 +2998,7 @@ raise SystemExit(main())
 Run: `.venv/bin/pytest tests/test_cli.py -v`
 Expected: PASS, 8 tests.
 
-Note `test_createuser_rejects_a_mismatched_confirmation` uses a 7-character second answer; both answers are shorter than `MIN_PASSWORD_LEN`, so the length check fires first and the test still asserts the correct outcome (exit 1, no user). If you prefer the mismatch path to be the one exercised, lengthen both answers past 12 characters — do not lower `MIN_PASSWORD_LEN`.
+Every test password except the one in `test_createuser_rejects_a_short_password` clears `MIN_PASSWORD_LEN`. Do not lower `MIN_PASSWORD_LEN` to make anything pass.
 
 - [ ] **Step 5: Commit**
 
@@ -3223,8 +3265,14 @@ have the Dockerfile pass it. Add to `build_parser`'s `serve` subparser:
     )
 ```
 
-and change the guard in `_serve` to `if bind == "0.0.0.0" and not allow_any:`. Update
-`test_bind_to_all_interfaces_is_refused` to still pass, and add:
+Then thread the flag through, three edits in `cli.py`:
+
+1. `_serve` gains a parameter: `def _serve(db_path, ttl_days, bind, port, conn, allow_any: bool) -> int:`
+2. Its guard becomes `if bind == "0.0.0.0" and not allow_any:  # noqa: S104`
+3. The call site becomes
+   `return _serve(args.db, args.ttl_days, args.bind, args.port, conn, args.allow_any_interface)`
+
+`test_bind_to_all_interfaces_is_refused` passes unchanged — it never sets the flag. Add:
 
 ```python
 def test_bind_to_all_interfaces_allowed_with_explicit_flag():
