@@ -100,9 +100,7 @@ def test_unresolved_img_reference_is_dropped():
 
 
 def test_img_resolution_does_not_apply_to_arbitrary_text():
-    out = render(
-        "the string img:arch.png is not an image here", "text", {"arch.png": "/f/s/blob/x"}
-    )
+    out = render("the string img:arch.png is not an image here", "md", {"arch.png": "/f/s/blob/x"})
     assert "/f/s/blob/x" not in out
 
 
