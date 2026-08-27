@@ -1,4 +1,6 @@
-from handoff import auth, db
+from starlette.requests import Request
+
+from handoff import auth, db, web
 
 
 def test_login_page_renders(client):
@@ -24,8 +26,9 @@ def _make_user(db_path):
 def test_login_sets_a_hardened_cookie(client, db_path):
     _make_user(db_path)
 
-    r = client.post("/login", data={"username": "yoshi", "password": "hunter2"},
-                    follow_redirects=False)
+    r = client.post(
+        "/login", data={"username": "yoshi", "password": "hunter2"}, follow_redirects=False
+    )
     assert r.status_code == 303
     cookie = r.headers["set-cookie"].lower()
     assert "httponly" in cookie
@@ -39,8 +42,9 @@ def test_cookie_is_secure_under_tls(db_path):
 
     _make_user(db_path)
     with TestClient(app_module.create_app(db_path), base_url="https://testserver") as tls:
-        r = tls.post("/login", data={"username": "yoshi", "password": "hunter2"},
-                     follow_redirects=False)
+        r = tls.post(
+            "/login", data={"username": "yoshi", "password": "hunter2"}, follow_redirects=False
+        )
     assert "secure" in r.headers["set-cookie"].lower()
 
 
@@ -50,8 +54,9 @@ def test_cookie_is_not_secure_over_plain_http(client, db_path):
     # deployment would not harden the session -- it would make login impossible.
     _make_user(db_path)
 
-    r = client.post("/login", data={"username": "yoshi", "password": "hunter2"},
-                    follow_redirects=False)
+    r = client.post(
+        "/login", data={"username": "yoshi", "password": "hunter2"}, follow_redirects=False
+    )
     assert "secure" not in r.headers["set-cookie"].lower()
 
 
@@ -61,8 +66,9 @@ def test_bad_password_does_not_log_in(client, db_path):
     c.close()
     auth.reset_throttle()
 
-    r = client.post("/login", data={"username": "yoshi", "password": "nope"},
-                    follow_redirects=False)
+    r = client.post(
+        "/login", data={"username": "yoshi", "password": "nope"}, follow_redirects=False
+    )
     assert r.status_code == 200
     assert auth.COOKIE_NAME not in r.cookies
 
@@ -89,3 +95,26 @@ def test_logout_without_csrf_is_rejected(human):
 def test_no_page_contains_a_script_tag(human):
     for path in ["/login", "/"]:
         assert "<script" not in human.get(path).text.lower()
+
+
+def _request_with_cookie(value: str) -> Request:
+    scope = {"type": "http", "headers": [(b"cookie", f"{auth.COOKIE_NAME}={value}".encode())]}
+    return Request(scope)
+
+
+def test_stale_cookie_does_not_mint_a_csrf_token_without_a_validated_user():
+    request = _request_with_cookie("attacker-supplied-garbage")
+    response = web.page(request, "login.html", error=None)
+    assert response.context["csrf"] == ""
+
+
+def test_validated_user_still_gets_a_working_csrf_token(conn):
+    uid = auth.create_user(conn, "yoshi", "hunter2")
+    sid = auth.create_session(conn, uid)
+    user = auth.session_user(conn, sid)
+
+    request = _request_with_cookie(sid)
+    response = web.page(request, "index.html", user=user, folders=[])
+
+    assert response.context["csrf"] != ""
+    assert auth.check_csrf(sid, response.context["csrf"])

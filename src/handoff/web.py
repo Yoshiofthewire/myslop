@@ -19,9 +19,7 @@ class LoginRequired(HTTPException):
         super().__init__(status_code=303, headers={"Location": "/login"}, detail="login required")
 
 
-def require_user(
-    request: Request, conn: sqlite3.Connection = Depends(get_conn)
-) -> sqlite3.Row:
+def require_user(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> sqlite3.Row:
     sid = request.cookies.get(auth.COOKIE_NAME, "")
     user = auth.session_user(conn, sid) if sid else None
     if user is None:
@@ -36,7 +34,9 @@ def require_csrf(request: Request, token: str) -> None:
 
 
 def page(request: Request, name: str, user: sqlite3.Row | None = None, **ctx):
-    sid = request.cookies.get(auth.COOKIE_NAME, "")
+    # csrf is derived only for an already-validated user (i.e. request went through
+    # require_user's session_user() lookup) -- never minted from a raw, unvalidated cookie.
+    sid = request.cookies.get(auth.COOKIE_NAME, "") if user else ""
     return templates.TemplateResponse(
         request, name, {"user": user, "csrf": auth.csrf_token(sid) if sid else "", **ctx}
     )
@@ -60,14 +60,18 @@ def login(
     sid = auth.create_session(conn, user["id"])
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
-        auth.COOKIE_NAME, sid, httponly=True, samesite="lax",
+        auth.COOKIE_NAME,
+        sid,
+        httponly=True,
+        samesite="lax",
         # Secure whenever TLS is actually in play -- including behind a terminating proxy,
         # because uvicorn runs with proxy_headers=True and honours X-Forwarded-Proto.
         # Over plain http a Secure cookie is simply never sent back, so hardcoding it
         # would break login on the documented tailnet deployment while protecting nothing
         # (tailnet traffic is already WireGuard-encrypted).
         secure=request.url.scheme == "https",
-        max_age=auth.SESSION_TTL, path="/",
+        max_age=auth.SESSION_TTL,
+        path="/",
     )
     return response
 
