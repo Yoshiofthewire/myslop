@@ -354,6 +354,76 @@ def test_add_post_rejects_total_image_bytes_over_ten_mb(conn):
         )
 
 
+def test_add_post_accepts_body_at_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    store.add_post(conn, "s", "opus", "agent", "T", "md", "x" * store.MAX_BODY_CHARS, ttl_days=7)
+
+
+def test_add_post_rejects_body_over_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn, "s", "opus", "agent", "T", "md", "x" * (store.MAX_BODY_CHARS + 1), ttl_days=7
+        )
+
+
+def test_add_post_accepts_title_at_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    store.add_post(
+        conn, "s", "opus", "agent", "x" * store.MAX_TITLE_CHARS, "md", "body", ttl_days=7
+    )
+
+
+def test_add_post_rejects_title_over_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn, "s", "opus", "agent", "x" * (store.MAX_TITLE_CHARS + 1), "md", "body", ttl_days=7
+        )
+
+
+def test_add_post_accepts_author_note_at_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    store.add_post(
+        conn,
+        "s",
+        "opus",
+        "agent",
+        "T",
+        "md",
+        "body",
+        author_note="x" * store.MAX_AUTHOR_NOTE_CHARS,
+        ttl_days=7,
+    )
+
+
+def test_add_post_rejects_author_note_over_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn,
+            "s",
+            "opus",
+            "agent",
+            "T",
+            "md",
+            "body",
+            author_note="x" * (store.MAX_AUTHOR_NOTE_CHARS + 1),
+            ttl_days=7,
+        )
+
+
+def test_set_status_accepts_owner_at_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    store.set_status(conn, "s", "claimed", "x" * store.MAX_OWNER_CHARS)
+
+
+def test_set_status_rejects_owner_over_the_length_cap(conn):
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(store.Invalid):
+        store.set_status(conn, "s", "claimed", "x" * (store.MAX_OWNER_CHARS + 1))
+
+
 def test_blob_is_invisible_after_folder_expiry(conn, monkeypatch):
     t = [1000]
     monkeypatch.setattr(clock, "now", lambda: t[0])

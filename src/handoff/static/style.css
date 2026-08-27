@@ -23,3 +23,13 @@ form.inline { display: inline; }
 table { border-collapse: collapse; }
 th, td { border: 1px solid #8886; padding: 0.25rem 0.5rem; }
 .error { color: #c33; }
+.compose { border-top: 1px solid #8884; padding-top: 0.5rem; margin-top: 1.5rem; }
+.compose form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+.compose label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+.compose input, .compose textarea, .compose select {
+  font: inherit; padding: 0.35rem; border: 1px solid #8886; border-radius: 0.25rem;
+}
+.compose textarea { resize: vertical; }
+.compose button { align-self: flex-start; padding: 0.35rem 1rem; }
+.compose .status-form { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
+.compose .status-form label { flex-direction: column; }

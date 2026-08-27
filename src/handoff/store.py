@@ -15,6 +15,14 @@ FORMATS = ("md", "html", "text")
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 10 * 1024 * 1024
 
+# No unbounded client text reaches the database. Both front doors (agent JSON, human form)
+# funnel through add_post/set_status, so capping here covers both -- same reasoning as the
+# image caps above, just for the fields that used to have no ceiling at all.
+MAX_BODY_CHARS = 1024 * 1024
+MAX_TITLE_CHARS = 200
+MAX_AUTHOR_NOTE_CHARS = 200
+MAX_OWNER_CHARS = 100
+
 _MAGIC = (
     (b"\x89PNG\r\n\x1a\n", "image/png"),
     (b"\xff\xd8\xff", "image/jpeg"),
@@ -104,6 +112,8 @@ def get_blob(conn: sqlite3.Connection, slug: str, blob_id: str) -> sqlite3.Row |
 def set_status(conn: sqlite3.Connection, slug: str, status: str, owner: str | None) -> None:
     if status not in STATUSES:
         raise Invalid(f"invalid status: {status!r}")
+    if owner is not None and len(owner) > MAX_OWNER_CHARS:
+        raise Invalid(f"owner exceeds {MAX_OWNER_CHARS} characters")
     if get_folder(conn, slug) is None:
         raise NotFound(slug)
     conn.execute("UPDATE folders SET status = ?, owner = ? WHERE slug = ?", (status, owner, slug))
@@ -124,6 +134,12 @@ def add_post(
 ) -> int:
     if fmt not in FORMATS:
         raise Invalid(f"invalid format: {fmt!r}")
+    if len(body) > MAX_BODY_CHARS:
+        raise Invalid(f"body exceeds {MAX_BODY_CHARS} characters")
+    if title is not None and len(title) > MAX_TITLE_CHARS:
+        raise Invalid(f"title exceeds {MAX_TITLE_CHARS} characters")
+    if author_note is not None and len(author_note) > MAX_AUTHOR_NOTE_CHARS:
+        raise Invalid(f"author_note exceeds {MAX_AUTHOR_NOTE_CHARS} characters")
     if get_folder(conn, slug) is None:
         raise NotFound(slug)
 

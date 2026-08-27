@@ -28,6 +28,13 @@ def require_user(request: Request, conn: sqlite3.Connection = Depends(get_conn))
 
 
 def require_csrf(request: Request, token: str) -> None:
+    # Must be called from inside a route body, after `user: ... = Depends(require_user)`
+    # has already resolved as a declared dependency -- never itself declared as a
+    # Depends(...) parameter. That ordering is what makes a logged-out POST redirect
+    # (303, from require_user's LoginRequired) instead of returning 403 here. FastAPI
+    # resolves Depends(...) params before the body runs, so a future author who turns
+    # this into a dependency listed ahead of `user` would silently invert that: a
+    # logged-out caller would see 403 before require_user ever gets a chance to run.
     sid = request.cookies.get(auth.COOKIE_NAME, "")
     if not sid or not auth.check_csrf(sid, token):
         raise HTTPException(status_code=403, detail="bad csrf token")
@@ -153,7 +160,13 @@ def create_post(
 ):
     require_csrf(request, csrf)
     store.add_post(
-        conn, slug, user["username"], "human", title or None, format, body,
+        conn,
+        slug,
+        user["username"],
+        "human",
+        title or None,
+        format,
+        body,
         ttl_days=request.app.state.ttl_days,
     )
     return RedirectResponse(f"/f/{slug}", status_code=303)
