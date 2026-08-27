@@ -206,3 +206,71 @@ def blob(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@router.get("/agents")
+def agents_page(
+    request: Request,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    return page(
+        request,
+        "agents.html",
+        user=user,
+        agents=auth.list_agents(conn),
+        new_token=None,
+        new_name=None,
+        error=None,
+    )
+
+
+@router.post("/agents")
+def mint_agent(
+    request: Request,
+    csrf: str = Form(default=""),
+    name: str = Form(...),
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    require_csrf(request, csrf)
+    try:
+        _, token = auth.mint_agent(conn, name)
+    except ValueError as exc:
+        return page(
+            request,
+            "agents.html",
+            user=user,
+            agents=auth.list_agents(conn),
+            new_token=None,
+            new_name=None,
+            error=str(exc),
+        )
+    response = page(
+        request,
+        "agents.html",
+        user=user,
+        agents=auth.list_agents(conn),
+        new_token=token,
+        new_name=name,
+        error=None,
+    )
+    # The plaintext token lives in this response body and nowhere else. no-store keeps
+    # it out of disk caches and shared-machine history-replay a step short of what a
+    # browser's own back/forward session history can still do (unavoidable for any
+    # reveal-once secret rendered as HTML).
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/agents/{agent_id}/revoke")
+def revoke_agent(
+    agent_id: str,
+    request: Request,
+    csrf: str = Form(default=""),
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    require_csrf(request, csrf)
+    auth.revoke_agent(conn, agent_id)
+    return RedirectResponse("/agents", status_code=303)

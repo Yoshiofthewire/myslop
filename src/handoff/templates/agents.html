@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}agents{% endblock %}
+{% block content %}
+<h1>Agents</h1>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+{% if new_token %}
+<div class="minted">
+  <p><strong>{{ new_name }}</strong> created. Copy this token now &mdash;
+     it is not stored and cannot be shown again.</p>
+  <p><code class="token">{{ new_token }}</code></p>
+</div>
+{% endif %}
+
+<form method="post" action="/agents">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Name <input name="name" required placeholder="opus-desktop"></label>
+  <button type="submit">Mint token</button>
+</form>
+
+<ul class="agents">
+  {% for a in agents %}
+  <li>
+    <strong>{{ a.name }}</strong>
+    {% if a.revoked_at %}
+      <span class="status status-done">revoked</span>
+    {% else %}
+      <form method="post" action="/agents/{{ a.id }}/revoke" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit">Revoke</button>
+      </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}
