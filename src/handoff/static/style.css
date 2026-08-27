@@ -306,30 +306,31 @@ form.inline {
 
 /* --- posts ------------------------------------------------------------- */
 
+/* Each post is its own card. A hairline rule between them was too easy to
+   skim past when posts run long. */
 .post {
-  border-top: 1px solid var(--line-soft);
-  padding-top: 1.25rem;
-  margin-top: 2rem;
-}
-
-/* The folder header already draws a rule; don't stack a second one under it. */
-.post:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-  margin-top: 1.5rem;
+  padding: 1.25rem 1.4rem;
+  margin-top: 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .post h2 {
   margin-bottom: 0.25rem;
 }
 
+/* The title and byline are the card's masthead: rule them off from the body. */
 .byline {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem;
+  padding-bottom: 0.9rem;
   margin: 0 0 1rem;
   font-size: 0.85rem;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .byline strong {
@@ -406,7 +407,7 @@ form.inline {
 
 .post .body pre {
   overflow-x: auto;
-  background: var(--panel);
+  background: var(--panel-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   padding: 0.9rem 1rem;
@@ -671,6 +672,10 @@ button:hover {
 
   .folders li .status {
     min-width: 0;
+  }
+
+  .post {
+    padding: 1rem;
   }
 
   .panel {
