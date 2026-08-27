@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}handoff{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <a href="/">handoff</a>
+    {% if user %}
+      <nav>
+        <a href="/agents">agents</a>
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit">log out {{ user.username }}</button>
+        </form>
+      </nav>
+    {% endif %}
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -65,6 +65,14 @@ def create_app(db_path: str, ttl_days: int = 7) -> FastAPI:
     def _not_found(request: Request, exc: NotFound):
         return JSONResponse({"detail": str(exc)}, status_code=404)
 
+    from handoff.web import LoginRequired
+
+    @application.exception_handler(LoginRequired)
+    def _login_required(request: Request, exc: LoginRequired):
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse("/login", status_code=303)
+
     application.include_router(api.router)
     application.include_router(web.router)
     application.mount(

@@ -37,3 +37,14 @@ def agent_token(db_path):
 @pytest.fixture
 def agent(agent_token):
     return {"Authorization": f"Bearer {agent_token}"}
+
+
+@pytest.fixture
+def human(client, db_path):
+    c = db.connect(db_path)
+    auth.create_user(c, "yoshi", "hunter2")
+    c.close()
+    auth.reset_throttle()
+    client.post("/login", data={"username": "yoshi", "password": "hunter2"},
+                follow_redirects=False)
+    return client
