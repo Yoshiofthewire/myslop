@@ -354,17 +354,29 @@ def test_add_post_rejects_total_image_bytes_over_ten_mb(conn):
         )
 
 
-def test_add_post_accepts_body_at_the_length_cap(conn):
+def test_add_post_accepts_ascii_body_at_the_byte_cap(conn):
+    """Plain ASCII: char count and byte count coincide, so this also pins the
+    common case isn't off by one now that the check is byte-based."""
     store.create_folder(conn, "s", "S", 7)
-    store.add_post(conn, "s", "opus", "agent", "T", "md", "x" * store.MAX_BODY_CHARS, ttl_days=7)
+    store.add_post(conn, "s", "opus", "agent", "T", "md", "x" * store.MAX_BODY_BYTES, ttl_days=7)
 
 
-def test_add_post_rejects_body_over_the_length_cap(conn):
+def test_add_post_rejects_ascii_body_over_the_byte_cap(conn):
     store.create_folder(conn, "s", "S", 7)
     with pytest.raises(store.Invalid):
         store.add_post(
-            conn, "s", "opus", "agent", "T", "md", "x" * (store.MAX_BODY_CHARS + 1), ttl_days=7
+            conn, "s", "opus", "agent", "T", "md", "x" * (store.MAX_BODY_BYTES + 1), ttl_days=7
         )
+
+
+def test_add_post_rejects_multibyte_body_over_byte_cap(conn):
+    """Char count comfortably under the byte cap, utf-8 byte count over it -- the
+    cap must bound bytes actually written to storage, not code points."""
+    store.create_folder(conn, "s", "S", 7)
+    chars = store.MAX_BODY_BYTES // 4 + 1
+    body = "\U0001f600" * chars  # 4 utf-8 bytes each: char count << cap, byte count > cap
+    with pytest.raises(store.Invalid):
+        store.add_post(conn, "s", "opus", "agent", "T", "md", body, ttl_days=7)
 
 
 def test_add_post_accepts_title_at_the_length_cap(conn):

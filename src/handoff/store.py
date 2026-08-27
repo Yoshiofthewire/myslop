@@ -18,7 +18,13 @@ MAX_TOTAL_IMAGE_BYTES = 10 * 1024 * 1024
 # No unbounded client text reaches the database. Both front doors (agent JSON, human form)
 # funnel through add_post/set_status, so capping here covers both -- same reasoning as the
 # image caps above, just for the fields that used to have no ceiling at all.
-MAX_BODY_CHARS = 1024 * 1024
+#
+# MAX_BODY_BYTES is measured in encoded utf-8 bytes, not code points: it exists as the real
+# backstop for the byte-based Content-Length check in app.py's middleware (which a chunked
+# request can skip), so a unit that varies with encoding would defeat the point. The others
+# are character counts -- they bound display width, not storage, and a 200-character title
+# is a 200-character title regardless of encoding.
+MAX_BODY_BYTES = 1024 * 1024
 MAX_TITLE_CHARS = 200
 MAX_AUTHOR_NOTE_CHARS = 200
 MAX_OWNER_CHARS = 100
@@ -134,8 +140,8 @@ def add_post(
 ) -> int:
     if fmt not in FORMATS:
         raise Invalid(f"invalid format: {fmt!r}")
-    if len(body) > MAX_BODY_CHARS:
-        raise Invalid(f"body exceeds {MAX_BODY_CHARS} characters")
+    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise Invalid(f"body exceeds {MAX_BODY_BYTES} bytes")
     if title is not None and len(title) > MAX_TITLE_CHARS:
         raise Invalid(f"title exceeds {MAX_TITLE_CHARS} characters")
     if author_note is not None and len(author_note) > MAX_AUTHOR_NOTE_CHARS:
