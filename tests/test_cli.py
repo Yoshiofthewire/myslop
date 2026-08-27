@@ -40,8 +40,17 @@ def test_createuser_rejects_a_short_password(db_path, monkeypatch):
 
 
 def test_reap_reports_what_it_deleted(db_path, capsys):
+    conn = db.connect(db_path)
+    db.init_schema(conn)
+    conn.execute(
+        "INSERT INTO folders (slug, title, created_at, last_post_at, expires_at)"
+        " VALUES ('old', 'old', 0, 0, 0)"
+    )
+    conn.commit()
+    conn.close()
+
     assert cli.main(["--db", db_path, "reap"]) == 0
-    assert "0" in capsys.readouterr().out
+    assert "Deleted 1 expired folders." in capsys.readouterr().out
 
 
 def test_serve_refuses_with_no_users(db_path, capsys):

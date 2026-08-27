@@ -41,4 +41,5 @@ def test_every_documented_endpoint_exists_in_the_app(db_path):
 def test_skill_states_the_expiry_rule():
     text = SKILL.read_text().lower()
     assert "7 day" in text or "seven day" in text
-    assert "not" in text and "memory" in text
+    # \s+ tolerates the doc's own line wrap between "not" and "memory".
+    assert re.search(r"not\s+memory", text)

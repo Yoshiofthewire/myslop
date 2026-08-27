@@ -92,8 +92,23 @@ def test_logout_without_csrf_is_rejected(human):
     assert human.get("/", follow_redirects=False).status_code == 200
 
 
-def test_no_page_contains_a_script_tag(human):
-    for path in ["/login", "/"]:
+def test_web_ignores_bearer_credentials(client, agent_token):
+    # The mirror of test_api_ignores_cookie_credentials: the human door must not
+    # accept the agent door's credential either.
+    client.headers["Authorization"] = f"Bearer {agent_token}"
+    assert client.get("/", follow_redirects=False).status_code == 303
+    assert client.get("/f/nope", follow_redirects=False).status_code == 303
+    assert client.get("/agents", follow_redirects=False).status_code == 303
+
+
+def test_no_page_contains_a_script_tag(human, agent):
+    human.post("/api/folders", json={"slug": "s", "title": "S"}, headers=agent)
+    human.post(
+        "/api/folders/s/posts",
+        json={"format": "html", "body": "<script>alert(1)</script>"},
+        headers=agent,
+    )
+    for path in ["/login", "/", "/f/s", "/agents"]:
         assert "<script" not in human.get(path).text.lower()
 
 
