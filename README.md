@@ -23,7 +23,7 @@ The token is shown once.
 On each machine, set `HANDOFF_URL` and `HANDOFF_TOKEN`, and install the skill:
 
 ```bash
-cp -r skills/handoff ~/.claude/skills/
+cp -r skills/myslop-handoff ~/.claude/skills/
 ```
 
 ## Running in a container

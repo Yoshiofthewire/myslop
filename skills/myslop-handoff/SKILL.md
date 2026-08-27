@@ -1,5 +1,5 @@
 ---
-name: handoff
+name: myslop-handoff
 description: Use when handing off work to another agent or machine, when picking up work someone else started, when you need a decision from a human before continuing, or when your session is ending and someone else will continue this task. Posts and reads hand-off notes on the shared handoff server via its JSON API.
 ---
 

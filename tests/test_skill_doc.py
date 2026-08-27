@@ -1,7 +1,10 @@
 import re
 from pathlib import Path
 
-SKILL = Path(__file__).resolve().parents[1] / "skills" / "handoff" / "SKILL.md"
+# Named myslop-handoff, not handoff: a plain "handoff" collides with other skills already
+# installed under ~/.claude/skills/. The directory name and the frontmatter name must agree,
+# because the install is a straight copy of this directory.
+SKILL = Path(__file__).resolve().parents[1] / "skills" / "myslop-handoff" / "SKILL.md"
 
 
 def test_skill_file_exists():
@@ -12,7 +15,7 @@ def test_skill_has_frontmatter_with_name_and_description():
     text = SKILL.read_text()
     assert text.startswith("---\n")
     front = text.split("---", 2)[1]
-    assert re.search(r"^name:\s*handoff\s*$", front, re.M)
+    assert re.search(r"^name:\s*myslop-handoff\s*$", front, re.M)
     assert re.search(r"^description:\s*\S", front, re.M)
 
 
