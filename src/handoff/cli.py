@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     serve = sub.add_parser("serve", help="run the service")
     serve.add_argument("--bind", default=os.environ.get("HANDOFF_BIND", "127.0.0.1"))
     serve.add_argument("--port", type=int, default=int(os.environ.get("HANDOFF_PORT", "8080")))
+    serve.add_argument(
+        "--allow-any-interface",
+        action="store_true",
+        help="permit binding 0.0.0.0 (containers only, where the host publishes the port)",
+    )
     return parser
 
 
@@ -64,8 +69,10 @@ def _logout_all(conn: sqlite3.Connection, username: str) -> int:
     return 0
 
 
-def _serve(db_path: str, ttl_days: int, bind: str, port: int, conn: sqlite3.Connection) -> int:
-    if bind == "0.0.0.0":  # noqa: S104
+def _serve(
+    db_path: str, ttl_days: int, bind: str, port: int, conn: sqlite3.Connection, allow_any: bool
+) -> int:
+    if bind == "0.0.0.0" and not allow_any:  # noqa: S104
         print(
             "Refusing to bind 0.0.0.0. Bind a specific interface (your tailnet address)"
             " or 127.0.0.1 behind a reverse proxy.",
@@ -106,7 +113,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Deleted {db.reap(conn)} expired folders.")
             return 0
         if args.command == "serve":
-            return _serve(args.db, args.ttl_days, args.bind, args.port, conn)
+            return _serve(
+                args.db, args.ttl_days, args.bind, args.port, conn, args.allow_any_interface
+            )
     finally:
         conn.close()
     return 1

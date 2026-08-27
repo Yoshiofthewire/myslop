@@ -63,6 +63,13 @@ def test_bind_to_all_interfaces_is_refused(db_path, monkeypatch, capsys):
     assert "0.0.0.0" in capsys.readouterr().err  # noqa: S104
 
 
+def test_bind_to_all_interfaces_allowed_with_explicit_flag():
+    args = cli.build_parser().parse_args(
+        ["serve", "--bind", "0.0.0.0", "--allow-any-interface"]  # noqa: S104
+    )
+    assert args.allow_any_interface is True
+
+
 def test_logout_all_deletes_every_session_for_the_user(db_path, capsys):
     c = db.connect(db_path)
     db.init_schema(c)
