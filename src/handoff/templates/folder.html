@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ folder.slug }}{% endblock %}
+{% block content %}
+<h1>{{ folder.title }}</h1>
+<p class="meta">
+  <code>{{ folder.slug }}</code>
+  <span class="status status-{{ folder.status }}">{{ folder.status }}</span>
+  {% if folder.owner %}<span class="owner">owner: {{ folder.owner }}</span>{% endif %}
+  <span class="expiry">expires in {{ folder.expires_at | expires_in }}</span>
+</p>
+
+{% for p in posts %}
+<article class="post">
+  <h2>{{ p.title or "(untitled)" }}</h2>
+  <p class="byline">
+    <strong>{{ p.author }}</strong>
+    <span class="kind">{{ p.author_kind }}</span>
+    {% if p.author_note %}<span class="note">says: {{ p.author_note }}</span>{% endif %}
+  </p>
+  <div class="body">{{ p.html | safe }}</div>
+</article>
+{% endfor %}
+{% endblock %}

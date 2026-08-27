@@ -3,11 +3,11 @@
 import sqlite3
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from handoff import auth
+from handoff import auth, clock, db, store
 from handoff.app import get_conn
 
 router = APIRouter()
@@ -34,8 +34,10 @@ def require_csrf(request: Request, token: str) -> None:
 
 
 def page(request: Request, name: str, user: sqlite3.Row | None = None, **ctx):
-    # csrf is derived only for an already-validated user (i.e. request went through
-    # require_user's session_user() lookup) -- never minted from a raw, unvalidated cookie.
+    # A csrf token is minted whenever `user` is truthy -- page() takes that on faith and
+    # does not itself verify that `user` came from a validated session; a hand-made dict
+    # would work just as well. Callers MUST obtain `user` via Depends(require_user), which
+    # is the only thing that actually ties it to a checked cookie. Every caller today does.
     sid = request.cookies.get(auth.COOKIE_NAME, "") if user else ""
     return templates.TemplateResponse(
         request, name, {"user": user, "csrf": auth.csrf_token(sid) if sid else "", **ctx}
@@ -91,6 +93,60 @@ def logout(
     return response
 
 
+def _expires_in(expires_at: int) -> str:
+    seconds = max(0, expires_at - clock.now())
+    days, rem = divmod(seconds, 86400)
+    if days:
+        return f"{days} day{'s' if days != 1 else ''}"
+    hours = rem // 3600
+    return f"{hours} hour{'s' if hours != 1 else ''}"
+
+
+templates.env.filters["expires_in"] = _expires_in
+
+
 @router.get("/")
-def index(request: Request, user: sqlite3.Row = Depends(require_user)):
-    return page(request, "index.html", user=user, folders=[])
+def index(
+    request: Request,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    db.reap(conn)
+    return page(request, "index.html", user=user, folders=store.list_folders(conn))
+
+
+@router.get("/f/{slug}")
+def folder_page(
+    slug: str,
+    request: Request,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    folder = store.get_folder(conn, slug)
+    if folder is None:
+        raise HTTPException(status_code=404, detail="no such folder")
+    return page(
+        request, "folder.html", user=user,
+        folder=folder, posts=store.list_posts(conn, slug), statuses=store.STATUSES,
+    )
+
+
+@router.get("/f/{slug}/blob/{blob_id}")
+def blob(
+    slug: str,
+    blob_id: str,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    row = store.get_blob(conn, slug, blob_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such image")
+    return Response(
+        content=row["bytes"],
+        media_type=row["mime"],
+        headers={
+            "Content-Disposition": f'inline; filename="{row["filename"]}"',
+            "Content-Security-Policy": "sandbox; default-src 'none'",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
