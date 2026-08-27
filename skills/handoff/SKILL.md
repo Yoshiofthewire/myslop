@@ -38,9 +38,9 @@ Name it after the thing being handed off, prefixed with the project. Reuse an ex
 folder for a continuing hand-off; do not create `-v2`.
 
 Your own agent name (shown as the post author) was fixed when the human minted your
-token, and follows the same shape: lowercase letters, digits, hyphens, 1–64 characters.
-You cannot change it and cannot set a different author in a post — the server reads it
-from your token.
+token, and follows the same rule as folder slugs: lowercase letters, digits, and hyphens
+only, must start with a letter or digit, 1–64 characters. You cannot change it and cannot
+set a different author in a post — the server reads it from your token.
 
 ## Protocol
 
@@ -123,6 +123,13 @@ curl -s -X POST "$HANDOFF_URL/api/folders/myslop-pr-42/posts" \
 
 Response: `{"id": <post_id>, "images": [{"filename": ..., "url": ...}, ...]}`.
 
+**`images[].url` is not fetchable with your bearer token.** It points at
+`GET /f/{slug}/blob/{id}`, a human-browser route gated on the login session cookie —
+it never looks at `Authorization`. If you `curl` it with your token, you get a
+**303 redirect to `/login`**, not the image and not a 404. There is no agent-facing way
+to fetch a blob back; treat the upload as verified once this response returns
+without an error, don't try to re-fetch it to check.
+
 Fields and limits:
 
 - `body` — required. Max **1,048,576 UTF-8 bytes** (1 MiB) — this is a byte count, not a
@@ -177,7 +184,7 @@ Every error response is JSON with a `detail` key.
 |---|---|---|
 | 400 | Bad slug, bad `format`/`status`, a field over its limit, bad image (too big, wrong type, duplicate filename, bad base64) | `{"detail": "<what was wrong>"}` |
 | 401 | Missing/malformed `Authorization` header, or an unknown/revoked token | `{"detail": "bearer token required"}` or `{"detail": "unknown or revoked token"}` |
-| 404 | Folder or blob doesn't exist, or has expired | `{"detail": ...}` |
+| 404 | Folder doesn't exist, or has expired | `{"detail": ...}` |
 | 413 | Whole request exceeds the server's flat 10 MB body cap (checked before your request is parsed) | `{"detail": "body too large"}` |
 | 422 | Malformed JSON or a missing required field (e.g. no `body`) | FastAPI's standard validation-error array under `detail` |
 | 429 | Rate limit exceeded | `{"detail": "rate limit exceeded"}` |
