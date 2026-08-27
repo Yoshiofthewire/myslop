@@ -1813,7 +1813,7 @@ git commit -m "feat: app factory with CSP and the agent JSON API"
   - `web.router` with `GET /login`, `POST /login`, `POST /logout`
   - `web.require_user(request, conn) -> sqlite3.Row` — dependency; raises a 303 redirect to `/login` when unauthenticated.
   - `web.templates: Jinja2Templates`
-  - `web.require_csrf(request, sid) -> None`
+  - `web.require_csrf(request, token: str) -> None` — `token` is the form-submitted value; the session id comes from the request cookie
   - pytest fixture `human` — a `TestClient` already logged in.
 
 - [ ] **Step 1: Write the failing tests**
