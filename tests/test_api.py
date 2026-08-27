@@ -1,6 +1,6 @@
 import base64
 
-from handoff import clock
+from handoff import clock, store
 
 DAY = 86400
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -90,6 +90,29 @@ def test_post_can_set_status_and_owner_atomically(client, agent):
     folder = client.get("/api/folders/s", headers=agent).json()
     assert folder["status"] == "claimed"
     assert folder["owner"] == "opus-desktop"
+
+
+def test_post_with_invalid_status_writes_nothing(client, agent):
+    """Claiming work and saying you claimed it must not half-succeed: an invalid
+    status must reject the whole request before the post itself is written."""
+    client.post("/api/folders", json={"slug": "s", "title": "S"}, headers=agent)
+    r = client.post(
+        "/api/folders/s/posts",
+        json={"format": "md", "body": "hello", "status": "sideways"},
+        headers=agent,
+    )
+    assert r.status_code == 400
+    folder = client.get("/api/folders/s", headers=agent).json()
+    assert folder["posts"] == []
+
+
+def test_status_endpoint_returns_404_not_500_if_reaped_right_after(client, agent, monkeypatch):
+    """A reap can land between the status UPDATE's commit and the route's read-back
+    of the updated folder. That must surface as a 404, not a None-propagated 500."""
+    client.post("/api/folders", json={"slug": "s", "title": "S"}, headers=agent)
+    monkeypatch.setattr(store, "get_folder", lambda c, s: None)
+    r = client.post("/api/folders/s/status", json={"status": "claimed"}, headers=agent)
+    assert r.status_code == 404
 
 
 def test_status_endpoint_rejects_unknown_status(client, agent):

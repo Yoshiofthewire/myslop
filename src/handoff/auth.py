@@ -38,7 +38,7 @@ _THROTTLE_BASE = 2
 
 
 def reset_throttle() -> None:
-    """Clear login throttling. For tests and the CLI."""
+    """Clear login throttling. For tests only -- no CLI path calls this."""
     _throttle.clear()
 
 

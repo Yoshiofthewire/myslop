@@ -99,6 +99,17 @@ def test_unresolved_img_reference_is_dropped():
     assert "img:nope.png" not in out
 
 
+def test_external_image_src_is_dropped():
+    out = render("![x](https://evil.example/x.png)", "md", {})
+    assert "evil.example" not in out
+    assert "src=" not in out
+
+
+def test_resolved_blob_image_src_survives():
+    out = render("![arch](img:arch.png)", "md", {"arch.png": "/f/s/blob/abc123"})
+    assert 'src="/f/s/blob/abc123"' in out
+
+
 def test_img_resolution_does_not_apply_to_arbitrary_text():
     out = render("the string img:arch.png is not an image here", "md", {"arch.png": "/f/s/blob/x"})
     assert "/f/s/blob/x" not in out

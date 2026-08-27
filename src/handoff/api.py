@@ -131,6 +131,11 @@ def create_post(
     agent: sqlite3.Row = Depends(require_agent),
     conn: sqlite3.Connection = Depends(get_conn),
 ):
+    if body.status is not None and body.status not in store.STATUSES:
+        raise store.Invalid(f"invalid status: {body.status!r}")
+    if body.owner is not None and len(body.owner) > store.MAX_OWNER_CHARS:
+        raise store.Invalid(f"owner exceeds {store.MAX_OWNER_CHARS} characters")
+
     images = []
     for img in body.images:
         try:
@@ -169,4 +174,8 @@ def set_status(
     conn: sqlite3.Connection = Depends(get_conn),
 ):
     store.set_status(conn, slug, body.status, body.owner)
-    return _folder_json(store.get_folder(conn, slug))
+    row = store.get_folder(conn, slug)
+    if row is None:
+        # A reap can land between set_status's commit and this read-back.
+        raise store.NotFound(slug)
+    return _folder_json(row)

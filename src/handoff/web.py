@@ -40,15 +40,20 @@ def require_csrf(request: Request, token: str) -> None:
         raise HTTPException(status_code=403, detail="bad csrf token")
 
 
-def page(request: Request, name: str, user: sqlite3.Row | None = None, **ctx):
+def page(
+    request: Request, name: str, user: sqlite3.Row | None = None, no_store: bool = False, **ctx
+):
     # A csrf token is minted whenever `user` is truthy -- page() takes that on faith and
     # does not itself verify that `user` came from a validated session; a hand-made dict
     # would work just as well. Callers MUST obtain `user` via Depends(require_user), which
     # is the only thing that actually ties it to a checked cookie. Every caller today does.
     sid = request.cookies.get(auth.COOKIE_NAME, "") if user else ""
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request, name, {"user": user, "csrf": auth.csrf_token(sid) if sid else "", **ctx}
     )
+    if no_store:
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/login")
@@ -124,7 +129,7 @@ def index(
     conn: sqlite3.Connection = Depends(get_conn),
 ):
     db.reap(conn)
-    return page(request, "index.html", user=user, folders=store.list_folders(conn))
+    return page(request, "index.html", user=user, no_store=True, folders=store.list_folders(conn))
 
 
 @router.get("/f/{slug}")
@@ -141,6 +146,7 @@ def folder_page(
         request,
         "folder.html",
         user=user,
+        no_store=True,
         folder=folder,
         posts=store.list_posts(conn, slug),
         statuses=store.STATUSES,

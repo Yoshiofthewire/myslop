@@ -2,9 +2,10 @@ import sqlite3
 
 import pytest
 
-from handoff import clock, db
+from handoff import auth, clock, db, store
 
 DAY = 86400
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * (50 * 1024)
 
 
 def _folder(conn, slug, expires_at):
@@ -73,3 +74,36 @@ def test_reap_is_idempotent(conn, monkeypatch):
 
 def test_init_schema_runs_twice_without_error(conn):
     db.init_schema(conn)
+
+
+def test_reap_fully_drains_the_freelist(conn, monkeypatch):
+    """A single-step `PRAGMA incremental_vacuum` only frees one page per call --
+    the file grows monotonically minus one page per reap. reap() must drain the
+    freelist completely, or the store's own stated purpose (bounded disk use) is
+    false in practice."""
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    for i in range(20):
+        slug = f"s{i}"
+        store.create_folder(conn, slug, "T", 7)
+        store.add_post(
+            conn, slug, "a", "agent", "T", "md", "x", images=[("i.png", PNG)], ttl_days=7
+        )
+
+    t[0] += 8 * DAY
+    assert db.reap(conn) == 20
+    assert conn.execute("PRAGMA freelist_count").fetchone()[0] == 0
+
+
+def test_reap_deletes_expired_sessions_but_still_reports_folder_count(conn, monkeypatch):
+    monkeypatch.setattr(clock, "now", lambda: 1000)
+    uid = auth.create_user(conn, "yoshi", "hunter2")
+    live_sid = auth.create_session(conn, uid)
+    expired_sid = auth.create_session(conn, uid)
+    conn.execute("UPDATE sessions SET expires_at = 999 WHERE id = ?", (expired_sid,))
+    conn.commit()
+    _folder(conn, "old", 999)
+
+    assert db.reap(conn) == 1  # return value still counts folders only
+    remaining = {r["id"] for r in conn.execute("SELECT id FROM sessions")}
+    assert remaining == {live_sid}

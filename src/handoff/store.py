@@ -28,6 +28,7 @@ MAX_BODY_BYTES = 1024 * 1024
 MAX_TITLE_CHARS = 200
 MAX_AUTHOR_NOTE_CHARS = 200
 MAX_OWNER_CHARS = 100
+MAX_FOLDER_TITLE_CHARS = 200
 
 _MAGIC = (
     (b"\x89PNG\r\n\x1a\n", "image/png"),
@@ -67,12 +68,14 @@ def safe_filename(name: str) -> str:
     """
     base = name.replace("\\", "/").rsplit("/", 1)[-1]
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", base)
-    return cleaned[:64].strip("-") or "file"
+    return cleaned[:64].strip("-.") or "file"
 
 
 def create_folder(conn: sqlite3.Connection, slug: str, title: str, ttl_days: int) -> sqlite3.Row:
     if not valid_slug(slug):
         raise Invalid(f"invalid slug: {slug!r}")
+    if len(title) > MAX_FOLDER_TITLE_CHARS:
+        raise Invalid(f"title exceeds {MAX_FOLDER_TITLE_CHARS} characters")
     existing = get_folder(conn, slug)
     if existing is not None:
         return existing
@@ -84,7 +87,14 @@ def create_folder(conn: sqlite3.Connection, slug: str, title: str, ttl_days: int
         (slug, title, now, now, now + ttl_days * 86400),
     )
     conn.commit()
-    return get_folder(conn, slug)
+    row = get_folder(conn, slug)
+    if row is None:
+        # A reap can land between the commit above and this read-back (or, at
+        # ttl_days=0, the row is already expired the instant it's written). Either
+        # way, a folder that just can't be read back is a 404, not a None the
+        # caller would crash on.
+        raise NotFound(slug)
+    return row
 
 
 def get_folder(conn: sqlite3.Connection, slug: str) -> sqlite3.Row | None:
@@ -120,10 +130,16 @@ def set_status(conn: sqlite3.Connection, slug: str, status: str, owner: str | No
         raise Invalid(f"invalid status: {status!r}")
     if owner is not None and len(owner) > MAX_OWNER_CHARS:
         raise Invalid(f"owner exceeds {MAX_OWNER_CHARS} characters")
-    if get_folder(conn, slug) is None:
-        raise NotFound(slug)
-    conn.execute("UPDATE folders SET status = ?, owner = ? WHERE slug = ?", (status, owner, slug))
+    # The expiry check is folded into the UPDATE itself, not a separate get_folder
+    # call beforehand: a reap landing between the two would otherwise make this
+    # UPDATE match zero rows and report success on a folder that's already gone.
+    cur = conn.execute(
+        "UPDATE folders SET status = ?, owner = ? WHERE slug = ? AND expires_at > ?",
+        (status, owner, slug, clock.now()),
+    )
     conn.commit()
+    if cur.rowcount == 0:
+        raise NotFound(slug)
 
 
 def add_post(

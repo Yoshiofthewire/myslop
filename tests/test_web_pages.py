@@ -58,6 +58,16 @@ def test_thread_does_not_execute_injected_script(human, agent):
     assert "<p>ok</p>" in body
 
 
+def test_index_and_thread_pages_are_not_cached(human, agent):
+    _seed(human, agent)
+    assert human.get("/").headers["cache-control"] == "no-store"
+    assert human.get("/f/myslop-pr-42").headers["cache-control"] == "no-store"
+
+
+def test_login_page_is_not_marked_no_store(client):
+    assert "cache-control" not in client.get("/login").headers
+
+
 def test_missing_folder_returns_404(human):
     assert human.get("/f/nope").status_code == 404
 

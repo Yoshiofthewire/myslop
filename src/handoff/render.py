@@ -49,6 +49,12 @@ ALLOWED_ATTRS = {
 
 URL_SCHEMES = {"http", "https", "mailto"}
 
+# Same-origin blob path only: /f/<slug>/blob/<hex-id>, exactly the shape add_post
+# mints in store.py. img src is restricted to this after sanitization -- url_schemes
+# above doesn't help here because a same-origin path has no scheme to check, and an
+# absolute http(s) URL would otherwise sail through it untouched.
+_BLOB_SRC_RE = re.compile(r"^/f/[a-z0-9][a-z0-9-]{0,63}/blob/[0-9a-f]+$")
+
 _md = MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"])
 
 _FORMATS = ("md", "html", "text")
@@ -61,10 +67,16 @@ def _resolve_images(source: str, blob_urls: dict[str, str]) -> str:
     for filename, url in blob_urls.items():
         source = re.sub(
             r"(?<=[(\"'])img:" + re.escape(filename) + r"(?=[)\"'\s])",
-            url,
+            lambda _match, url=url: url,
             source,
         )
     return source
+
+
+def _restrict_img_src(tag: str, attr: str, value: str) -> str | None:
+    if tag == "img" and attr == "src" and not _BLOB_SRC_RE.fullmatch(value):
+        return None
+    return value
 
 
 def sanitize(dirty: str) -> str:
@@ -75,6 +87,7 @@ def sanitize(dirty: str) -> str:
         url_schemes=URL_SCHEMES,
         link_rel="noopener noreferrer nofollow",
         strip_comments=True,
+        attribute_filter=_restrict_img_src,
     )
 
 

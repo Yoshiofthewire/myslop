@@ -56,6 +56,13 @@ def test_safe_filename_strips_paths_and_exotic_characters():
     assert store.safe_filename("") == "file"
 
 
+def test_safe_filename_never_returns_dot_or_dotdot():
+    # Only reaches a Content-Disposition header today, but "." or ".." surviving
+    # as a "safe" filename is a footgun waiting for a future caller.
+    assert store.safe_filename(".") == "file"
+    assert store.safe_filename("..") == "file"
+
+
 def test_create_folder_is_idempotent(conn, monkeypatch):
     monkeypatch.setattr(clock, "now", lambda: 1000)
     first = store.create_folder(conn, "myslop-pr-42", "PR 42", 7)
@@ -69,6 +76,25 @@ def test_create_folder_is_idempotent(conn, monkeypatch):
 def test_create_folder_rejects_bad_slug(conn):
     with pytest.raises(store.Invalid):
         store.create_folder(conn, "../etc", "nope", 7)
+
+
+def test_create_folder_raises_not_found_instead_of_none_if_reaped_immediately(conn, monkeypatch):
+    """If a reap lands between create_folder's own commit and its read-back (or,
+    degenerately, ttl_days=0 expires the row the instant it's written), the read
+    must not hand back None for the caller to crash on -- it's a 404."""
+    monkeypatch.setattr(store, "get_folder", lambda c, s: None)
+    with pytest.raises(store.NotFound):
+        store.create_folder(conn, "s", "S", 7)
+
+
+def test_create_folder_accepts_title_at_the_length_cap(conn):
+    store.create_folder(conn, "s", "x" * store.MAX_FOLDER_TITLE_CHARS, 7)
+
+
+def test_create_folder_rejects_title_over_the_length_cap(conn):
+    with pytest.raises(store.Invalid):
+        store.create_folder(conn, "s", "x" * (store.MAX_FOLDER_TITLE_CHARS + 1), 7)
+    assert store.get_folder(conn, "s") is None
 
 
 def test_add_post_extends_expiry(conn, monkeypatch):
@@ -247,6 +273,8 @@ def test_add_post_resolves_distinct_filenames_to_distinct_blobs(conn):
         "---",
         ".hidden",
         "a" * 64 + "-" * 10,
+        ".",
+        "..",
     ],
 )
 def test_safe_filename_is_idempotent(name):
@@ -324,6 +352,35 @@ def test_add_post_survives_a_reap_race_as_not_found(tmp_path, monkeypatch):
 
     with pytest.raises(store.NotFound):
         store.add_post(conn, "s", "opus", "agent", "t", "md", "body", ttl_days=7)
+
+    conn.close()
+
+
+def test_set_status_survives_a_reap_race_as_not_found(tmp_path, monkeypatch):
+    """set_status must not check existence and then update separately: if a reap
+    lands in between, the UPDATE would match zero rows and silently report success.
+    Folding the expiry condition into the UPDATE itself closes that window -- proven
+    here against a folder actually reaped out from under it by a second connection."""
+    path = str(tmp_path / "handoff.db")
+    conn = db.connect(path)
+    db.init_schema(conn)
+
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    store.create_folder(conn, "s", "S", 7)
+
+    # The folder expires and a second connection reaps it for real.
+    t[0] += 8 * DAY
+    reaper = db.connect(path)
+    assert db.reap(reaper) == 1
+    reaper.close()
+
+    # Simulate set_status's own existence check having run a moment earlier, before
+    # the reap committed -- the row it saw is now gone by the time the UPDATE runs.
+    monkeypatch.setattr(store, "get_folder", lambda c, s: {"slug": s})
+
+    with pytest.raises(store.NotFound):
+        store.set_status(conn, "s", "claimed", "opus")
 
     conn.close()
 

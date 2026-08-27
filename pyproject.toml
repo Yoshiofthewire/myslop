@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "ruff"]
+dev = ["pytest", "httpx", "ruff==0.16.4"]
 
 [project.scripts]
 handoff = "handoff.cli:main"
