@@ -80,6 +80,9 @@ endpoint below returns `429 {"detail": "rate limit exceeded"}`.
 Idempotent: calling it on a slug that already exists returns that folder unchanged (the
 title you pass is ignored if the folder is already there).
 
+`title` — required. Max **200 characters** (not bytes, same limit as post `title`
+below). Over the limit: `400 {"detail": "title exceeds 200 characters"}`.
+
 ```bash
 curl -s -X POST "$HANDOFF_URL/api/folders" \
   -H "Authorization: Bearer $HANDOFF_TOKEN" -H "Content-Type: application/json" \

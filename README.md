@@ -87,8 +87,10 @@ automatically at startup), `serve` (run the service).
   counting bytes as they arrive**, so a chunked-encoded request without that header skips
   it. It exists only as a coarse first line of defense. The real backstop is the
   store-layer caps, which are enforced against the decoded data itself and are not
-  skippable: 1 MiB of post body (measured in UTF-8 bytes), 5 MB per image, 10 MB of images
-  total per post.
+  skippable: 1 MiB of post body (measured in UTF-8 bytes), 200 characters of post title,
+  200 characters of folder title, 200 characters of author note, 100 characters of owner,
+  5 MB per image, 10 MB of images total per post. No client-supplied string reaches the
+  database without one of these caps applied.
 
 ## Development
 
