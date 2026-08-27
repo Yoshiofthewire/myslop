@@ -47,7 +47,10 @@ def hash_token(token: str) -> bytes:
 
 
 def mint_agent(conn: sqlite3.Connection, name: str) -> tuple[str, str]:
-    """Create an agent and return (agent_id, plaintext token). The token is not recoverable."""
+    """Create an agent and return (agent_id, plaintext token). The token is not recoverable.
+
+    Raises ValueError if name doesn't match AGENT_NAME_RE or is already in use.
+    """
     if not AGENT_NAME_RE.fullmatch(name):
         raise ValueError(
             "agent name must be lowercase letters, digits, and hyphens, 1-64 characters, "
@@ -156,6 +159,20 @@ def session_user(conn: sqlite3.Connection, sid: str) -> sqlite3.Row | None:
 def delete_session(conn: sqlite3.Connection, sid: str) -> None:
     conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
     conn.commit()
+
+
+def delete_all_sessions(conn: sqlite3.Connection, username: str) -> int:
+    """Delete every session row for a username. Raises ValueError if the user is unknown.
+
+    Login never revokes prior sessions, so this is the only way to invalidate a leaked
+    cookie without direct database access.
+    """
+    row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if row is None:
+        raise ValueError(f"no such user: {username}")
+    cur = conn.execute("DELETE FROM sessions WHERE user_id = ?", (row["id"],))
+    conn.commit()
+    return cur.rowcount
 
 
 def csrf_token(sid: str) -> str:
