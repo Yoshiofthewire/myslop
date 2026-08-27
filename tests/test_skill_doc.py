@@ -27,13 +27,12 @@ def test_every_documented_endpoint_exists_in_the_app(db_path):
     schema = app.openapi()
     served = {(m.upper(), path) for path, methods in schema["paths"].items() for m in methods}
 
-    documented = set(
-        re.findall(r"\b(GET|POST)\s+(/api/[a-z0-9{}/_-]+)", SKILL.read_text())
-    )
+    documented = set(re.findall(r"\b(GET|POST)\s+(/api/[a-z0-9{}/_-]+)", SKILL.read_text()))
     assert documented, "skill documents no endpoints"
 
-    normalised = {(m, re.sub(r"\{[a-z_]+\}", "{slug}", p.split("?")[0].rstrip("/")))
-                  for m, p in documented}
+    normalised = {
+        (m, re.sub(r"\{[a-z_]+\}", "{slug}", p.split("?")[0].rstrip("/"))) for m, p in documented
+    }
     served_norm = {(m, re.sub(r"\{[a-z_]+\}", "{slug}", p.rstrip("/"))) for m, p in served}
 
     assert normalised <= served_norm, f"undocumented-or-wrong: {normalised - served_norm}"

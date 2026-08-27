@@ -93,8 +93,11 @@ def _serve(
     # proxy_headers honours X-Forwarded-Proto, so a TLS-terminating reverse proxy makes
     # request.url.scheme == "https" and the session cookie comes back marked Secure.
     uvicorn.run(
-        create_app(db_path, ttl_days), host=bind, port=port,
-        proxy_headers=True, forwarded_allow_ips="127.0.0.1",
+        create_app(db_path, ttl_days),
+        host=bind,
+        port=port,
+        proxy_headers=True,
+        forwarded_allow_ips="127.0.0.1",
     )
     return 0
 
