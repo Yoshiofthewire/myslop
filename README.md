@@ -29,17 +29,31 @@ cp -r skills/myslop-handoff ~/.claude/skills/
 ## Running in a container
 
 ```bash
-docker build -t handoff .
-docker run -d -p 127.0.0.1:8080:8080 -v handoff-data:/data handoff
-docker exec -it <container> handoff --db /data/handoff.db createuser yoshi
+docker volume create handoff-data      # first time only
+docker compose up -d --build
+docker compose exec handoff handoff --db /data/handoff.db createuser yoshi
 ```
+
+To deploy a new version, on the host that serves the site:
+
+```bash
+git pull && docker compose up -d --build
+curl -s http://127.0.0.1:8080/static/style.css | head -1   # confirm it actually changed
+```
+
+The database lives in the `handoff-data` volume, not the image, so rebuilding never
+touches it. `compose.yaml` declares that volume `external` deliberately: left to itself
+compose would invent a project-prefixed `myslop_handoff-data`, and the site would come up
+against an empty database looking like every hand-off had vanished. External makes that a
+startup error instead of a silent one.
 
 `serve` refuses to bind `0.0.0.0` by default: a homelab tool that quietly listens on every
 interface is how a private thing becomes public. The container's `CMD` passes
 `--allow-any-interface` to override that refusal, and this is correct only inside a
 container — the process binds the container's own interfaces, and the host decides what's
-reachable via `-p`. Publish the port bound to `127.0.0.1` (as above) or to your tailnet
-address, never bare `-p 8080:8080` on an internet-facing host.
+reachable via the published port. `compose.yaml` publishes to `127.0.0.1:8080`; point
+`HANDOFF_PUBLISH` at a tailnet address to change that, never at a bare `8080:8080` on an
+internet-facing host.
 
 ## Configuration
 

@@ -1,0 +1,23 @@
+services:
+  handoff:
+    build: .
+    image: handoff
+    restart: unless-stopped
+    # Publish to loopback by default. The host's reverse proxy is what decides who can
+    # reach this; binding it to every interface here is how a private thing goes public.
+    # Override for a tailnet address: HANDOFF_PUBLISH=100.x.y.z:8080
+    ports:
+      - "${HANDOFF_PUBLISH:-127.0.0.1:8080}:8080"
+    volumes:
+      - handoff-data:/data
+    environment:
+      HANDOFF_TTL_DAYS: "${HANDOFF_TTL_DAYS:-7}"
+
+volumes:
+  # Declared external on purpose. Left to itself, compose would create a project-prefixed
+  # volume (myslop_handoff-data) and the site would come up with an empty database,
+  # looking like every hand-off had vanished. External means it fails loudly instead.
+  # First time only: docker volume create handoff-data
+  handoff-data:
+    external: true
+    name: handoff-data
