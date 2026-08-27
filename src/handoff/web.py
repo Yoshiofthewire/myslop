@@ -140,6 +140,40 @@ def folder_page(
     )
 
 
+@router.post("/f/{slug}/post")
+def create_post(
+    slug: str,
+    request: Request,
+    csrf: str = Form(default=""),
+    body: str = Form(...),
+    title: str = Form(default=""),
+    format: str = Form(default="md"),
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    require_csrf(request, csrf)
+    store.add_post(
+        conn, slug, user["username"], "human", title or None, format, body,
+        ttl_days=request.app.state.ttl_days,
+    )
+    return RedirectResponse(f"/f/{slug}", status_code=303)
+
+
+@router.post("/f/{slug}/status")
+def update_status(
+    slug: str,
+    request: Request,
+    csrf: str = Form(default=""),
+    status: str = Form(...),
+    owner: str = Form(default=""),
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    require_csrf(request, csrf)
+    store.set_status(conn, slug, status, owner or None)
+    return RedirectResponse(f"/f/{slug}", status_code=303)
+
+
 @router.get("/f/{slug}/blob/{blob_id}")
 def blob(
     slug: str,
