@@ -352,3 +352,14 @@ def test_add_post_rejects_total_image_bytes_over_ten_mb(conn):
             images=[("a.png", chunk), ("b.png", chunk), ("c.png", chunk)],
             ttl_days=7,
         )
+
+
+def test_blob_is_invisible_after_folder_expiry(conn, monkeypatch):
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    store.create_folder(conn, "s", "S", 7)
+    store.add_post(conn, "s", "opus", "agent", "T", "md", "x", images=[("i.png", PNG)], ttl_days=7)
+    blob_id = conn.execute("SELECT id FROM blobs").fetchone()["id"]
+
+    t[0] += 8 * DAY
+    assert store.get_blob(conn, "s", blob_id) is None

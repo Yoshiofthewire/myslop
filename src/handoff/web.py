@@ -98,8 +98,13 @@ def _expires_in(expires_at: int) -> str:
     days, rem = divmod(seconds, 86400)
     if days:
         return f"{days} day{'s' if days != 1 else ''}"
-    hours = rem // 3600
-    return f"{hours} hour{'s' if hours != 1 else ''}"
+    hours, rem = divmod(rem, 3600)
+    if hours:
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+    minutes = rem // 60
+    if minutes:
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    return "under a minute"
 
 
 templates.env.filters["expires_in"] = _expires_in
@@ -126,8 +131,12 @@ def folder_page(
     if folder is None:
         raise HTTPException(status_code=404, detail="no such folder")
     return page(
-        request, "folder.html", user=user,
-        folder=folder, posts=store.list_posts(conn, slug), statuses=store.STATUSES,
+        request,
+        "folder.html",
+        user=user,
+        folder=folder,
+        posts=store.list_posts(conn, slug),
+        statuses=store.STATUSES,
     )
 
 

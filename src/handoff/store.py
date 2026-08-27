@@ -92,8 +92,12 @@ def list_posts(conn: sqlite3.Connection, slug: str, since: int = 0) -> list[sqli
 
 
 def get_blob(conn: sqlite3.Connection, slug: str, blob_id: str) -> sqlite3.Row | None:
+    # Joined against folders and filtered on expires_at, like get_folder and list_folders:
+    # reads are what make expiry take effect instantly, not the reaper -- it's a backstop.
     return conn.execute(
-        "SELECT * FROM blobs WHERE id = ? AND folder = ?", (blob_id, slug)
+        "SELECT blobs.* FROM blobs JOIN folders ON folders.slug = blobs.folder"
+        " WHERE blobs.id = ? AND blobs.folder = ? AND folders.expires_at > ?",
+        (blob_id, slug, clock.now()),
     ).fetchone()
 
 
