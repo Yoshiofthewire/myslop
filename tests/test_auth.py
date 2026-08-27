@@ -37,6 +37,55 @@ def test_duplicate_agent_name_is_rejected(conn):
         auth.mint_agent(conn, "opus-desktop")
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "opus-laptop ",  # trailing space
+        " opus-laptop",  # leading space
+        "opus-laptop​",  # trailing zero-width space
+        "OPUS-LAPTOP",  # uppercase
+        "opus‐laptop",  # U+2010 hyphen, not ascii '-'
+    ],
+)
+def test_charset_confusable_names_are_rejected_not_stored_as_distinct_agents(conn, name):
+    auth.mint_agent(conn, "opus-laptop")
+    with pytest.raises(ValueError):
+        auth.mint_agent(conn, name)
+    assert conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0] == 1
+
+
+def test_genuine_duplicate_reports_already_in_use(conn):
+    auth.mint_agent(conn, "opus-laptop")
+    with pytest.raises(ValueError, match="already in use"):
+        auth.mint_agent(conn, "opus-laptop")
+
+
+def test_empty_agent_name_is_rejected(conn):
+    with pytest.raises(ValueError):
+        auth.mint_agent(conn, "")
+
+
+def test_whitespace_only_agent_name_is_rejected(conn):
+    with pytest.raises(ValueError):
+        auth.mint_agent(conn, "   ")
+
+
+def test_overlong_agent_name_is_rejected(conn):
+    with pytest.raises(ValueError):
+        auth.mint_agent(conn, "a" * 65)
+
+
+def test_max_length_agent_name_is_accepted(conn):
+    name = "a" * 64
+    auth.mint_agent(conn, name)
+    assert conn.execute("SELECT name FROM agents").fetchone()["name"] == name
+
+
+def test_ordinary_agent_name_still_mints_and_authenticates(conn):
+    _, token = auth.mint_agent(conn, "opus-desktop")
+    assert auth.agent_by_token(conn, token) is not None
+
+
 def test_password_round_trip(conn):
     auth.create_user(conn, "yoshi", "correct horse battery staple")
 

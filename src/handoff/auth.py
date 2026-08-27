@@ -6,6 +6,7 @@ to this module and two routes -- nothing above it changes.
 
 import hashlib
 import hmac
+import re
 import secrets
 import sqlite3
 import uuid
@@ -18,6 +19,12 @@ from handoff import clock
 SESSION_TTL = 30 * 86400
 COOKIE_NAME = "handoff_session"
 MAX_USERNAME_LEN = 64
+
+# Lowercase slug only: no whitespace, no case variants, no invisible or confusable
+# characters. A rendered name is what a human trusts to attribute a post -- a charset
+# this narrow is the whole defense, not a first line of one, so it stays total rather
+# than trying to enumerate the many ways Unicode can render two names identically.
+AGENT_NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 
 _ph = PasswordHasher()
 # Verified on every login attempt for an unknown/passwordless username, so that path
@@ -41,6 +48,11 @@ def hash_token(token: str) -> bytes:
 
 def mint_agent(conn: sqlite3.Connection, name: str) -> tuple[str, str]:
     """Create an agent and return (agent_id, plaintext token). The token is not recoverable."""
+    if not AGENT_NAME_RE.fullmatch(name):
+        raise ValueError(
+            "agent name must be lowercase letters, digits, and hyphens, 1-64 characters, "
+            f"starting with a letter or digit: {name!r}"
+        )
     agent_id = uuid.uuid4().hex
     token = str(uuid.uuid4())
     try:

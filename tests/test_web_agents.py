@@ -43,6 +43,15 @@ def test_duplicate_agent_name_is_reported_not_crashed(human):
     assert "already in use" in r.text
 
 
+def test_invalid_charset_name_is_reported_not_crashed(human):
+    r = human.post(
+        "/agents", data={"csrf": _csrf(human), "name": "Not Valid!"}, follow_redirects=True
+    )
+    assert r.status_code == 200
+    assert 'class="error"' in r.text
+    assert "already in use" not in r.text
+
+
 def test_mint_requires_csrf(human):
     r = human.post("/agents", data={"name": "x"}, follow_redirects=False)
     assert r.status_code == 403
