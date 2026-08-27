@@ -1,35 +1,689 @@
-:root { color-scheme: light dark; }
+/* handoff --- a strip board. Machine data is monospace, prose is sans.
+   Dark mode follows the OS: there is no site JavaScript to toggle it with. */
+
+:root {
+  color-scheme: light dark;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", "Cascadia Mono", Menlo,
+    Consolas, monospace;
+
+  --bg: #eef2f3;
+  --panel: #ffffff;
+  --panel-2: #f5f9fa;
+  --line: #cbd9de;
+  --line-soft: #e0e9ec;
+  --ink: #10191d;
+  --ink-2: #34474e;
+  --muted: #4e656e;
+  --accent: #0b6e85;
+  --accent-ink: #ffffff;
+  --accent-soft: #dceef3;
+
+  --st-open: #0f7a45;
+  --st-claimed: #8f5400;
+  --st-blocked: #b4291b;
+  --st-done: #56707e;
+
+  --radius: 0.5rem;
+  --shadow: 0 1px 2px rgb(16 25 29 / 6%), 0 1px 8px rgb(16 25 29 / 4%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a1318;
+    --panel: #141f27;
+    --panel-2: #1a2831;
+    --line: #2b3f4a;
+    --line-soft: #21313a;
+    --ink: #dde9ee;
+    --ink-2: #b0c5ce;
+    --muted: #87a1ad;
+    --accent: #58cfe8;
+    --accent-ink: #06222a;
+    --accent-soft: #10333d;
+
+    --st-open: #4ed88f;
+    --st-claimed: #f0b152;
+    --st-blocked: #ff7a66;
+    --st-done: #8199a6;
+
+    --shadow: none;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-  max-width: 52rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--bg);
+  max-width: 54rem;
   margin: 0 auto;
+  padding: 1.25rem 1.25rem 5rem;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 1.75rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
+/* --- shell ------------------------------------------------------------- */
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+header .brand {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+header .brand::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 0.02em;
+}
+
+header nav {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+header nav a,
+header button {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+header button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+header nav a:hover,
+header button:hover {
+  color: var(--accent);
+}
+
+form.inline {
+  display: inline;
+}
+
+/* --- eyebrow: the rule the whole product runs on ----------------------- */
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 2rem;
+}
+
+/* --- status ------------------------------------------------------------ */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.5rem 0.1rem 0.4rem;
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.status::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-open {
+  color: var(--st-open);
+}
+.status-claimed {
+  color: var(--st-claimed);
+}
+.status-blocked {
+  color: var(--st-blocked);
+}
+.status-done {
+  color: var(--st-done);
+}
+
+.expiry,
+.owner,
+.kind,
+.note {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the board --------------------------------------------------------- */
+
+.folders {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.folders li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.85rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Status first, in a fixed column: scan the left edge to see what needs you.
+   On the board it is a readout, not a badge -- the column does the framing. */
+.folders li .status {
+  order: -1;
+  flex: 0 0 auto;
+  min-width: 6.25rem;
+  padding-left: 0;
+  border-color: transparent;
+  background: none;
+}
+
+.folders li > a {
+  flex: 1 1 12rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.folders li > a:hover {
+  color: var(--accent);
+}
+
+.folders li:hover {
+  border-color: var(--line);
+}
+
+.empty {
+  color: var(--muted);
+  padding: 2rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* --- folder header ----------------------------------------------------- */
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  padding-bottom: 1.25rem;
+  margin: 0 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.meta code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: none;
+  padding: 0;
+}
+
+/* --- posts ------------------------------------------------------------- */
+
+.post {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 1.25rem;
+  margin-top: 2rem;
+}
+
+/* The folder header already draws a rule; don't stack a second one under it. */
+.post:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 1.5rem;
+}
+
+.post h2 {
+  margin-bottom: 0.25rem;
+}
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+}
+
+.byline strong {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.kind {
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Prose keeps a readable measure even though the shell is wider. */
+.post .body {
+  max-width: 68ch;
+}
+
+.post .body > :first-child {
+  margin-top: 0;
+}
+
+.post .body p,
+.post .body ul,
+.post .body ol,
+.post .body blockquote {
+  margin: 0 0 1rem;
+}
+
+.post .body h1,
+.post .body h2,
+.post .body h3 {
+  margin: 1.75rem 0 0.5rem;
+}
+
+.post .body h1 {
+  font-size: 1.3rem;
+}
+.post .body h2 {
+  font-size: 1.15rem;
+}
+.post .body h3 {
+  font-size: 1rem;
+}
+
+.post .body li {
+  margin-bottom: 0.25rem;
+}
+
+.post .body blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1rem;
+  color: var(--ink-2);
+}
+
+.post .body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.post .body code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 0.25rem;
+  padding: 0.05em 0.2em;
+}
+
+.post .body pre {
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  line-height: 1.5;
+}
+
+.post .body pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.post .body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2rem 0;
+}
+
+/* --- tables ------------------------------------------------------------ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+th {
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- forms ------------------------------------------------------------- */
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  padding: 0.45rem 0.55rem;
+}
+
+/* A select and a text input must end up the same height, or the row of labels
+   above them lands on two different baselines. */
+input,
+select {
+  min-height: 2.4rem;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 8rem;
+  line-height: 1.6;
+}
+
+button {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: color-mix(in srgb, var(--accent) 85%, var(--ink));
+}
+
+/* A standalone form is a panel: login, mint a token. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+  max-width: 26rem;
+  padding: 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel button {
+  align-self: flex-start;
+}
+
+.compose {
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+  margin-top: 3rem;
+}
+
+.compose form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.compose button {
+  align-self: flex-start;
+}
+
+.compose .status-form {
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
 }
-header { display: flex; justify-content: space-between; align-items: baseline; }
-header nav { display: flex; gap: 1rem; align-items: baseline; }
-form.inline { display: inline; }
-.status { border-radius: 0.25rem; padding: 0 0.4rem; font-size: 0.85rem; }
-.status-open { background: #2d6; color: #000; }
-.status-claimed { background: #59f; color: #000; }
-.status-blocked { background: #f73; color: #000; }
-.status-done { background: #999; color: #000; }
-.expiry, .owner, .kind, .note { color: #888; font-size: 0.85rem; }
-.folders { list-style: none; padding: 0; }
-.folders li { display: flex; gap: 0.75rem; align-items: baseline; padding: 0.35rem 0; }
-.post { border-top: 1px solid #8884; padding-top: 0.5rem; margin-top: 1.5rem; }
-.post .body img { max-width: 100%; }
-.post .body pre { overflow-x: auto; background: #8881; padding: 0.5rem; }
-table { border-collapse: collapse; }
-th, td { border: 1px solid #8886; padding: 0.25rem 0.5rem; }
-.error { color: #c33; }
-.compose { border-top: 1px solid #8884; padding-top: 0.5rem; margin-top: 1.5rem; }
-.compose form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
-.compose label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
-.compose input, .compose textarea, .compose select {
-  font: inherit; padding: 0.35rem; border: 1px solid #8886; border-radius: 0.25rem;
+
+.compose .status-form label {
+  flex-direction: column;
 }
-.compose textarea { resize: vertical; }
-.compose button { align-self: flex-start; padding: 0.35rem 1rem; }
-.compose .status-form { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
-.compose .status-form label { flex-direction: column; }
+
+/* Posting is the primary action here; setting status is not. */
+.compose .status-form button {
+  color: var(--accent);
+  background: none;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  min-height: 2.4rem;
+}
+
+.compose .status-form button:hover {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --- agents ------------------------------------------------------------ */
+
+.agents {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agents li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.agents li strong {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+/* Revoking is permanent and burns the name for good: make it look like it. */
+.agents button {
+  color: var(--st-blocked);
+  background: none;
+  border-color: color-mix(in srgb, var(--st-blocked) 40%, transparent);
+  padding: 0.3rem 0.7rem;
+}
+
+.agents button:hover {
+  color: var(--panel);
+  background: var(--st-blocked);
+  border-color: var(--st-blocked);
+}
+
+/* --- callouts ---------------------------------------------------------- */
+
+.minted {
+  border: 1px solid color-mix(in srgb, var(--st-claimed) 45%, transparent);
+  background: color-mix(in srgb, var(--st-claimed) 9%, transparent);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.minted p {
+  margin: 0 0 0.75rem;
+}
+
+.minted p:last-child {
+  margin-bottom: 0;
+}
+
+.token {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+  padding: 0.6rem 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+}
+
+.error {
+  color: var(--st-blocked);
+  border-left: 2px solid currentColor;
+  padding: 0.15rem 0 0.15rem 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* --- narrow screens ---------------------------------------------------- */
+
+@media (max-width: 34rem) {
+  body {
+    padding: 1rem 1rem 3rem;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  .folders li .status {
+    min-width: 0;
+  }
+
+  .panel {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

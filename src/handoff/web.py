@@ -129,7 +129,14 @@ def index(
     conn: sqlite3.Connection = Depends(get_conn),
 ):
     db.reap(conn)
-    return page(request, "index.html", user=user, no_store=True, folders=store.list_folders(conn))
+    return page(
+        request,
+        "index.html",
+        user=user,
+        no_store=True,
+        folders=store.list_folders(conn),
+        ttl_days=request.app.state.ttl_days,
+    )
 
 
 @router.get("/f/{slug}")

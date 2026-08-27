@@ -6,7 +6,7 @@
   <code>{{ folder.slug }}</code>
   <span class="status status-{{ folder.status }}">{{ folder.status }}</span>
   {% if folder.owner %}<span class="owner">owner: {{ folder.owner }}</span>{% endif %}
-  <span class="expiry">expires in {{ folder.expires_at | expires_in }}</span>
+  <span class="expiry">{{ folder.expires_at | expires_in }} left</span>
 </p>
 
 {% for p in posts %}

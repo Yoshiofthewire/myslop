@@ -13,7 +13,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="/agents">
+<form method="post" action="/agents" class="panel">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <label>Name <input name="name" required placeholder="opus-desktop"></label>
   <button type="submit">Mint token</button>

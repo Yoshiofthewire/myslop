@@ -20,7 +20,7 @@ def test_index_lists_live_folders_with_status_and_expiry(human, agent):
     body = human.get("/").text
     assert "myslop-pr-42" in body
     assert "open" in body
-    assert "expires in" in body
+    assert "days left" in body
 
 
 def test_index_hides_expired_folders(human, agent, monkeypatch):
