@@ -1,6 +1,6 @@
 import pytest
 
-from handoff import clock, store
+from handoff import clock, db, store
 
 DAY = 86400
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -297,3 +297,47 @@ def test_recreating_an_expired_slug_does_not_resurrect_its_posts(conn, monkeypat
     assert store.list_posts(conn, "s") == []
     assert conn.execute("SELECT count(*) c FROM posts").fetchone()["c"] == 0
     assert conn.execute("SELECT count(*) c FROM blobs").fetchone()["c"] == 0
+
+
+def test_add_post_survives_a_reap_race_as_not_found(tmp_path, monkeypatch):
+    """A folder can be reaped by another connection between add_post's own existence
+    check and its INSERT. That must surface as NotFound, not a raw IntegrityError."""
+    path = str(tmp_path / "handoff.db")
+    conn = db.connect(path)
+    db.init_schema(conn)
+
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    store.create_folder(conn, "s", "S", 7)
+
+    # The folder expires and a second connection reaps it for real.
+    t[0] += 8 * DAY
+    reaper = db.connect(path)
+    assert db.reap(reaper) == 1
+    reaper.close()
+
+    # Simulate add_post's existence check having run a moment earlier, before the
+    # reap committed -- the row it saw is now gone by the time the INSERT runs.
+    monkeypatch.setattr(store, "get_folder", lambda c, s: {"slug": s})
+
+    with pytest.raises(store.NotFound):
+        store.add_post(conn, "s", "opus", "agent", "t", "md", "body", ttl_days=7)
+
+    conn.close()
+
+
+def test_add_post_rejects_total_image_bytes_over_ten_mb(conn):
+    store.create_folder(conn, "s", "S", 7)
+    chunk = PNG + b"\x00" * (4 * 1024 * 1024)  # 4MB, legal alone
+    with pytest.raises(store.Invalid):
+        store.add_post(
+            conn,
+            "s",
+            "opus",
+            "agent",
+            "T",
+            "md",
+            "x",
+            images=[("a.png", chunk), ("b.png", chunk), ("c.png", chunk)],
+            ttl_days=7,
+        )

@@ -147,6 +147,16 @@ def test_missing_folder_returns_404(client, agent):
     assert client.get("/api/folders/nope", headers=agent).status_code == 404
 
 
+def test_posting_to_missing_folder_returns_404(client, agent):
+    r = client.post("/api/folders/nope/posts", json={"format": "md", "body": "x"}, headers=agent)
+    assert r.status_code == 404
+
+
+def test_status_update_on_missing_folder_returns_404(client, agent):
+    r = client.post("/api/folders/nope/status", json={"status": "claimed"}, headers=agent)
+    assert r.status_code == 404
+
+
 def test_expired_folder_is_gone_from_the_api(client, agent, monkeypatch):
     t = [1000]
     monkeypatch.setattr(clock, "now", lambda: t[0])
@@ -159,6 +169,14 @@ def test_expired_folder_is_gone_from_the_api(client, agent, monkeypatch):
 
 def test_security_headers_are_present(client, agent):
     r = client.get("/api/folders", headers=agent)
+    assert "script-src 'none'" in r.headers["content-security-policy"]
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_body_too_large_response_still_has_security_headers(client, agent):
+    headers = {**agent, "Content-Length": str(20 * 1024 * 1024)}
+    r = client.post("/api/folders", json={"slug": "s", "title": "S"}, headers=headers)
+    assert r.status_code == 413
     assert "script-src 'none'" in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
 

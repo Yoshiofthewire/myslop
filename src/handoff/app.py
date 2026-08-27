@@ -30,7 +30,10 @@ def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
 def create_app(db_path: str, ttl_days: int = 7) -> FastAPI:
     from handoff import api, web
 
-    application = FastAPI(title="handoff", docs_url="/api/docs", redoc_url=None)
+    # docs_url is disabled: script-src 'none' blocks Swagger UI's JS, so it would render
+    # as a permanently broken page. openapi_url stays at its default so agents can still
+    # fetch /openapi.json directly.
+    application = FastAPI(title="handoff", docs_url=None, redoc_url=None)
     application.state.db_path = db_path
     application.state.ttl_days = ttl_days
 
@@ -41,12 +44,14 @@ def create_app(db_path: str, ttl_days: int = 7) -> FastAPI:
 
     @application.middleware("http")
     async def security_headers(request: Request, call_next):
-        if request.headers.get("content-length", "").isdigit():
-            if int(request.headers["content-length"]) > MAX_BODY_BYTES:
-                return JSONResponse({"detail": "body too large"}, status_code=413)
-        response = await call_next(request)
+        content_length = request.headers.get("content-length", "")
+        if content_length.isdigit() and int(content_length) > MAX_BODY_BYTES:
+            response = JSONResponse({"detail": "body too large"}, status_code=413)
+        else:
+            response = await call_next(request)
         # setdefault, not assignment: the blob route sets its own stricter sandbox CSP
-        # and must not have it overwritten on the way out.
+        # and must not have it overwritten on the way out. Applied to every response
+        # this middleware returns, including the early 413, not just the call_next path.
         response.headers.setdefault("Content-Security-Policy", CSP)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")

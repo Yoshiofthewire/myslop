@@ -13,6 +13,7 @@ STATUSES = ("open", "claimed", "blocked", "done")
 FORMATS = ("md", "html", "text")
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_TOTAL_IMAGE_BYTES = 10 * 1024 * 1024
 
 _MAGIC = (
     (b"\x89PNG\r\n\x1a\n", "image/png"),
@@ -124,6 +125,10 @@ def add_post(
 
     # Blob ids are random, so they can be minted before insert. That means the URLs are
     # known at render time and the post row is written complete, in one transaction.
+    total_bytes = sum(len(data) for _, data in images)
+    if total_bytes > MAX_TOTAL_IMAGE_BYTES:
+        raise Invalid(f"total image size exceeds {MAX_TOTAL_IMAGE_BYTES} bytes")
+
     prepared = []
     blob_urls = {}
     for raw_name, data in images:
@@ -143,21 +148,30 @@ def add_post(
     html = render(body, fmt, blob_urls)
     now = clock.now()
 
-    with conn:
-        cur = conn.execute(
-            "INSERT INTO posts (folder, author, author_kind, author_note, title,"
-            " source_format, source, html, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (slug, author, author_kind, author_note, title, fmt, body, html, now),
-        )
-        post_id = cur.lastrowid
-        for blob_id, name, mime, data in prepared:
-            conn.execute(
-                "INSERT INTO blobs (id, folder, post_id, filename, mime, bytes, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (blob_id, slug, post_id, name, mime, data, now),
+    try:
+        with conn:
+            cur = conn.execute(
+                "INSERT INTO posts (folder, author, author_kind, author_note, title,"
+                " source_format, source, html, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (slug, author, author_kind, author_note, title, fmt, body, html, now),
             )
-        conn.execute(
-            "UPDATE folders SET last_post_at = ?, expires_at = ? WHERE slug = ?",
-            (now, now + ttl_days * 86400, slug),
-        )
+            post_id = cur.lastrowid
+            for blob_id, name, mime, data in prepared:
+                conn.execute(
+                    "INSERT INTO blobs (id, folder, post_id, filename, mime, bytes, created_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (blob_id, slug, post_id, name, mime, data, now),
+                )
+            conn.execute(
+                "UPDATE folders SET last_post_at = ?, expires_at = ? WHERE slug = ?",
+                (now, now + ttl_days * 86400, slug),
+            )
+    except sqlite3.IntegrityError as exc:
+        # The folder's TTL can lapse and be reaped by another connection between the
+        # existence check above and this INSERT. That race surfaces here as a foreign
+        # key violation, which is really just a slower NotFound -- not a server error.
+        # Any other integrity error (e.g. a CHECK constraint) is a real bug: let it propagate.
+        if "FOREIGN KEY" in str(exc):
+            raise NotFound(slug) from exc
+        raise
     return post_id
