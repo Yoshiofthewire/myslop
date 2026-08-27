@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from handoff import clock, db, store
@@ -324,6 +326,15 @@ def test_add_post_survives_a_reap_race_as_not_found(tmp_path, monkeypatch):
         store.add_post(conn, "s", "opus", "agent", "t", "md", "body", ttl_days=7)
 
     conn.close()
+
+
+def test_add_post_propagates_check_constraint_violations(conn):
+    """A CHECK-constraint violation (e.g. a bad author_kind) is a programming
+    error, not a reap race, and must not be swallowed into NotFound or Invalid --
+    the add_post except clause only translates FOREIGN KEY violations."""
+    store.create_folder(conn, "s", "S", 7)
+    with pytest.raises(sqlite3.IntegrityError):
+        store.add_post(conn, "s", "opus", "not-a-real-kind", "t", "md", "body", ttl_days=7)
 
 
 def test_add_post_rejects_total_image_bytes_over_ten_mb(conn):

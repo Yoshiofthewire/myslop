@@ -170,8 +170,12 @@ def add_post(
         # The folder's TTL can lapse and be reaped by another connection between the
         # existence check above and this INSERT. That race surfaces here as a foreign
         # key violation, which is really just a slower NotFound -- not a server error.
-        # Any other integrity error (e.g. a CHECK constraint) is a real bug: let it propagate.
-        if "FOREIGN KEY" in str(exc):
+        # Matched by exact error code, not message text: SQLite bundles differ across
+        # the Python versions this project supports, and the code is stable since
+        # sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY was exposed in Python 3.11, this
+        # project's floor. Any other integrity error (e.g. a CHECK constraint) is a
+        # real bug: let it propagate.
+        if exc.sqlite_errorcode == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
             raise NotFound(slug) from exc
         raise
     return post_id
