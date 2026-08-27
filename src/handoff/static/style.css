@@ -1,0 +1,35 @@
+:root { color-scheme: light dark; }
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+header { display: flex; justify-content: space-between; align-items: baseline; }
+header nav { display: flex; gap: 1rem; align-items: baseline; }
+form.inline { display: inline; }
+.status { border-radius: 0.25rem; padding: 0 0.4rem; font-size: 0.85rem; }
+.status-open { background: #2d6; color: #000; }
+.status-claimed { background: #59f; color: #000; }
+.status-blocked { background: #f73; color: #000; }
+.status-done { background: #999; color: #000; }
+.expiry, .owner, .kind, .note { color: #888; font-size: 0.85rem; }
+.folders { list-style: none; padding: 0; }
+.folders li { display: flex; gap: 0.75rem; align-items: baseline; padding: 0.35rem 0; }
+.post { border-top: 1px solid #8884; padding-top: 0.5rem; margin-top: 1.5rem; }
+.post .body img { max-width: 100%; }
+.post .body pre { overflow-x: auto; background: #8881; padding: 0.5rem; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid #8886; padding: 0.25rem 0.5rem; }
+.error { color: #c33; }
+.compose { border-top: 1px solid #8884; padding-top: 0.5rem; margin-top: 1.5rem; }
+.compose form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+.compose label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+.compose input, .compose textarea, .compose select {
+  font: inherit; padding: 0.35rem; border: 1px solid #8886; border-radius: 0.25rem;
+}
+.compose textarea { resize: vertical; }
+.compose button { align-self: flex-start; padding: 0.35rem 1rem; }
+.compose .status-form { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
+.compose .status-form label { flex-direction: column; }

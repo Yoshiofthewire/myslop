@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ folder.slug }}{% endblock %}
+{% block content %}
+<h1>{{ folder.title }}</h1>
+<p class="meta">
+  <code>{{ folder.slug }}</code>
+  <span class="status status-{{ folder.status }}">{{ folder.status }}</span>
+  {% if folder.owner %}<span class="owner">owner: {{ folder.owner }}</span>{% endif %}
+  <span class="expiry">expires in {{ folder.expires_at | expires_in }}</span>
+</p>
+
+{% for p in posts %}
+<article class="post">
+  <h2>{{ p.title or "(untitled)" }}</h2>
+  <p class="byline">
+    <strong>{{ p.author }}</strong>
+    <span class="kind">{{ p.author_kind }}</span>
+    {% if p.author_note %}<span class="note">says: {{ p.author_note }}</span>{% endif %}
+  </p>
+  <div class="body">{{ p.html | safe }}</div>
+</article>
+{% endfor %}
+
+<section class="compose">
+  <h2>Reply</h2>
+  <form method="post" action="/f/{{ folder.slug }}/post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Title <input name="title"></label>
+    <label>Body
+      <textarea name="body" rows="8" required
+                placeholder="Markdown. What you decided, what's next."></textarea>
+    </label>
+    <input type="hidden" name="format" value="md">
+    <button type="submit">Post</button>
+  </form>
+
+  <form method="post" action="/f/{{ folder.slug }}/status" class="status-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Status
+      <select name="status">
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if s == folder.status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Owner <input name="owner" value="{{ folder.owner or '' }}"></label>
+    <button type="submit">Set</button>
+  </form>
+</section>
+{% endblock %}

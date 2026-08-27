@@ -1,0 +1,27 @@
+[Unit]
+Description=Agent hand-off site
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=handoff
+Group=handoff
+Environment=HANDOFF_DB=/var/lib/handoff/handoff.db
+Environment=HANDOFF_TTL_DAYS=7
+ExecStart=/opt/handoff/.venv/bin/handoff serve --bind TAILSCALE_IP --port 8080
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/handoff
+StateDirectory=handoff
+
+[Install]
+WantedBy=multi-user.target

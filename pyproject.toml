@@ -1,0 +1,48 @@
+[project]
+name = "handoff"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "jinja2",
+    "markdown-it-py",
+    "nh3",
+    "argon2-cffi",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "ruff==0.16.4"]
+
+[project.scripts]
+handoff = "handoff.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+handoff = ["templates/*.html", "static/*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection pattern requires calling Depends()/Header()/Query() in
+# argument defaults; they return sentinel markers, not mutable state, so B008 doesn't apply.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]
