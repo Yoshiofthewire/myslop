@@ -502,3 +502,14 @@ def test_blob_is_invisible_after_folder_expiry(conn, monkeypatch):
 
     t[0] += 8 * DAY
     assert store.get_blob(conn, "s", blob_id) is None
+
+
+def test_list_folders_puts_the_soonest_to_expire_first(conn, monkeypatch):
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    # Alphabetical order would put these the other way round.
+    store.create_folder(conn, "a", "A", 7)
+    t[0] = 1000 + DAY
+    store.create_folder(conn, "b", "B", 3)
+
+    assert [f["slug"] for f in store.list_folders(conn)] == ["b", "a"]

@@ -105,7 +105,9 @@ def get_folder(conn: sqlite3.Connection, slug: str) -> sqlite3.Row | None:
 
 def list_folders(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT * FROM folders WHERE expires_at > ? ORDER BY slug", (clock.now(),)
+        # Soonest to expire first: the board's job is to surface what runs out first.
+        "SELECT * FROM folders WHERE expires_at > ? ORDER BY expires_at, slug",
+        (clock.now(),),
     ).fetchall()
 
 
