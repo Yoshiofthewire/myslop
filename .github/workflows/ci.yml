@@ -4,6 +4,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # The point of the matrix is per-version SQLite behavior; cancelling the other
+      # versions on the first failure hides exactly what we're testing for.
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.14"]
     steps:
