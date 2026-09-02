@@ -92,6 +92,12 @@ def reap(conn: sqlite3.Connection) -> int:
     conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
     conn.commit()
     if cur.rowcount:
-        conn.execute("PRAGMA incremental_vacuum").fetchall()
+        # SQLite 3.46 (what CI's python:3.11 image ships) frees exactly one page per
+        # `incremental_vacuum` call; 3.53 drains the whole freelist in one. Loop until
+        # it stops shrinking, so bounded disk use holds on both.
+        prev = None
+        while (free := conn.execute("PRAGMA freelist_count").fetchone()[0]) and free != prev:
+            prev = free
+            conn.execute("PRAGMA incremental_vacuum").fetchall()
         conn.commit()
     return cur.rowcount

@@ -46,3 +46,11 @@ def test_skill_states_the_expiry_rule():
     assert "7 day" in text or "seven day" in text
     # \s+ tolerates the doc's own line wrap between "not" and "memory".
     assert re.search(r"not\s+memory", text)
+
+
+def test_skill_requires_a_named_author_note():
+    text = SKILL.read_text()
+    # The three-part note is the only thing distinguishing two instances sharing a token,
+    # so the format and the pick-once rule both have to survive edits to this document.
+    assert "<system> / <model> / <your own name>" in text
+    assert re.search(r"Choose your own name once", text)

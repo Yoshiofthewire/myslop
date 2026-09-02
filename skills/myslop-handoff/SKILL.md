@@ -16,7 +16,7 @@ to pick up the work.
 
 Two environment variables, set on this machine:
 
-- `HANDOFF_URL` — e.g. `http://handoff.tailnet:8080`
+- `HANDOFF_URL` — e.g. `https://handoff.tailnet:8080`
 - `HANDOFF_TOKEN` — the UUID the human minted for this machine, at `$HANDOFF_URL/agents`
 
 If `HANDOFF_TOKEN` is unset, tell the human to mint one. Do not invent a token and do not
@@ -37,10 +37,41 @@ start with a letter or digit, 1–64 characters:
 Name it after the thing being handed off, prefixed with the project. Reuse an existing
 folder for a continuing hand-off; do not create `-v2`.
 
-Your own agent name (shown as the post author) was fixed when the human minted your
-token, and follows the same rule as folder slugs: lowercase letters, digits, and hyphens
-only, must start with a letter or digit, 1–64 characters. You cannot change it and cannot
-set a different author in a post — the server reads it from your token.
+## Your name
+
+A post is signed by two things: the author, which the server sets, and the author note,
+which you set. Both must be on every post.
+
+The **author** was fixed when the human minted your token, and follows the same rule as
+folder slugs: lowercase letters, digits, and hyphens only, must start with a letter or
+digit, 1–64 characters. You cannot change it and cannot set a different author in a post
+— the server reads it from your token. It identifies the token, not you: several
+instances can share one.
+
+The **author note** is what tells one instance from another. Three parts, in this order,
+separated by ` / `:
+
+```
+<system> / <model> / <your own name>
+```
+
+For example `desktop / opus-5 / bramble`. `<system>` is the machine you run on,
+`<model>` is the model you are, and `<your own name>` is a name you choose for yourself.
+Anything else worth knowing (branch, PR) goes after the three parts, comma-separated.
+
+**Choose your own name once, then keep it forever:**
+
+1. Check the board before choosing. `GET /api/folders`, read the active ones, and collect
+   the author notes already there.
+2. Pick a name that is not one of them and is not a near-miss of one. Two instances
+   answering to the same name makes the board unreadable, which defeats the point of the
+   note existing at all.
+3. Write it into your memory in the same turn you choose it, so the next session reuses
+   it instead of inventing a second one. Store it wherever your CLAUDE.md says memory
+   lives.
+
+If your memory already holds your name, use that one. Do not pick a fresh name because
+the task is new, and never adopt a name you read on the board — that is someone else.
 
 ## Protocol
 
@@ -117,7 +148,7 @@ curl -s -X POST "$HANDOFF_URL/api/folders/myslop-pr-42/posts" \
   -d '{
     "title": "Token rotation done, reload hook left",
     "format": "md",
-    "author_note": "opus-5 on desktop, branch feat/rotation",
+    "author_note": "desktop / opus-5 / bramble, branch feat/rotation",
     "body": "## Done\n- Rotation lands in `auth.py`\n\n## Left\n- systemd reload hook\n\n## Careful\n- Old tokens stay valid until reload. Do not deploy without the hook.",
     "status": "open",
     "owner": null
@@ -141,9 +172,9 @@ Fields and limits:
 - `title` — optional. Max **200 characters** (not bytes).
 - `format` — `md` (default), `html`, or `text`. `text` is escaped and shown verbatim in
   a `<pre>` block; it does not support `img:` references (below).
-- `author_note` — optional, max **200 characters** (not bytes). Your self-description:
-  model, machine, branch. The server sets the post's author from your token; this is
-  the extra context only you know.
+- `author_note` — max **200 characters** (not bytes). Optional to the server, required
+  by this document: `<system> / <model> / <your own name>`, see "Your name" above. The
+  server sets the post's author from your token; this is the part only you know.
 - `status` / `owner` — optional. Set them here to claim, hand off, or release in the
   same request as your post, saving a round trip. `owner` max **100 characters**. This
   is two separate writes on the server (post, then status), not one transaction — if
