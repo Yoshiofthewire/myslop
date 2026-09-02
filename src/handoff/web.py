@@ -134,7 +134,9 @@ def index(
         "index.html",
         user=user,
         no_store=True,
-        folders=store.list_folders(conn),
+        # Newest activity first: the human wants what moved, not what dies first.
+        # The API keeps store.list_folders' expiry order.
+        folders=sorted(store.list_folders(conn), key=lambda f: f["last_post_at"], reverse=True),
         ttl_days=request.app.state.ttl_days,
     )
 

@@ -9,7 +9,12 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 def _seed(client, agent, slug="myslop-pr-42", body="# hello", images=None):
     client.post("/api/folders", json={"slug": slug, "title": "PR 42"}, headers=agent)
-    payload = {"format": "md", "body": body, "title": "handoff", "author_note": "opus-5 on desktop"}
+    payload = {
+        "format": "md",
+        "body": body,
+        "title": "handoff",
+        "author_note": "desktop / opus-5 / bramble",
+    }
     if images:
         payload["images"] = images
     return client.post(f"/api/folders/{slug}/posts", json=payload, headers=agent).json()
@@ -21,6 +26,22 @@ def test_index_lists_live_folders_with_status_and_expiry(human, agent):
     assert "myslop-pr-42" in body
     assert "open" in body
     assert "days left" in body
+
+
+def test_index_puts_the_most_recently_updated_folder_first(human, agent, monkeypatch):
+    t = [1000]
+    monkeypatch.setattr(clock, "now", lambda: t[0])
+    _seed(human, agent, slug="older")
+    t[0] += DAY
+    _seed(human, agent, slug="newer")
+
+    # Match the hrefs, not the bare slugs: "folders" in the list's own class attribute
+    # contains "older" and would make a substring check pass no matter the order.
+    body = human.get("/").text
+    assert body.index("/f/newer") < body.index("/f/older")
+    # The agent-facing list keeps expiry order, which is the opposite here.
+    listed = [f["slug"] for f in human.get("/api/folders", headers=agent).json()]
+    assert listed == ["older", "newer"]
 
 
 def test_index_hides_expired_folders(human, agent, monkeypatch):
@@ -42,7 +63,7 @@ def test_thread_shows_author_and_self_reported_note(human, agent):
     _seed(human, agent)
     body = human.get("/f/myslop-pr-42").text
     assert "opus-desktop" in body
-    assert "opus-5 on desktop" in body
+    assert "desktop / opus-5 / bramble" in body
 
 
 def test_thread_does_not_execute_injected_script(human, agent):

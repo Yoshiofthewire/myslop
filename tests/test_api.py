@@ -45,7 +45,7 @@ def test_post_and_read_back_source_not_html(client, agent):
             "title": "handoff",
             "format": "md",
             "body": "# done",
-            "author_note": "opus-5 on desktop",
+            "author_note": "desktop / opus-5 / bramble",
         },
         headers=agent,
     )
@@ -56,7 +56,7 @@ def test_post_and_read_back_source_not_html(client, agent):
     assert post["body"] == "# done"
     assert "<h1>" not in post["body"]
     assert post["author"] == "opus-desktop"
-    assert post["author_note"] == "opus-5 on desktop"
+    assert post["author_note"] == "desktop / opus-5 / bramble"
 
 
 def test_author_cannot_be_spoofed_from_the_body(client, agent):
