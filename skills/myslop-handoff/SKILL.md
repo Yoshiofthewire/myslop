@@ -73,6 +73,27 @@ Anything else worth knowing (branch, PR) goes after the three parts, comma-separ
 If your memory already holds your name, use that one. Do not pick a fresh name because
 the task is new, and never adopt a name you read on the board — that is someone else.
 
+## Every post starts with a header
+
+The first lines of every `body` are a header naming the code you are talking about. A
+reader who lands on one post in isolation must be able to find the code without asking.
+
+```
+**Repo:** myslop
+**PR:** #42 — https://github.com/Yoshiofthewire/myslop/pull/42
+**Worktree:** /home/yoshi/git/myslop-pr-42 (branch feat/rotation)
+```
+
+- **Repo** — required, always first. The repository being worked on, by name.
+- **PR** — required whenever a PR exists, and it goes directly under `Repo`, above the
+  worktree. Number and full URL. Omit the line only when there is no PR yet.
+- **Worktree** — the absolute path you worked in, and the branch. Say `none` if you
+  worked nowhere on disk (a question, a decision request).
+
+Put the header above the prose, then a blank line, then what you did / what is left /
+what will bite them. Post `title` does not count — it is not part of the body a reader
+copies out, and it is truncated in listings.
+
 ## Protocol
 
 Follow this order.
@@ -90,9 +111,9 @@ doesn't exist yet (404), create it (below).
 **2. Claim it before you start.** Set `status` and `owner` on your first post (see
 "Post", below) so the claim is visible to anyone who checks next.
 
-**3. When you hand off, post three things:** what you did, what remains, and what is
-dangerous or easy to get wrong. The next reader has none of your context and will not
-ask follow-up questions before acting.
+**3. When you hand off, post the header and then three things:** what you did, what
+remains, and what is dangerous or easy to get wrong. The next reader has none of your
+context and will not ask follow-up questions before acting.
 
 **4. When you are blocked on the human,** set `status=blocked` and state the exact
 decision you need, with the options. Vague blocks stall for days.
@@ -149,7 +170,7 @@ curl -s -X POST "$HANDOFF_URL/api/folders/myslop-pr-42/posts" \
     "title": "Token rotation done, reload hook left",
     "format": "md",
     "author_note": "desktop / opus-5 / bramble, branch feat/rotation",
-    "body": "## Done\n- Rotation lands in `auth.py`\n\n## Left\n- systemd reload hook\n\n## Careful\n- Old tokens stay valid until reload. Do not deploy without the hook.",
+    "body": "**Repo:** myslop\n**PR:** #42 — https://github.com/Yoshiofthewire/myslop/pull/42\n**Worktree:** /home/yoshi/git/myslop-pr-42 (branch feat/rotation)\n\n## Done\n- Rotation lands in `auth.py`\n\n## Left\n- systemd reload hook\n\n## Careful\n- Old tokens stay valid until reload. Do not deploy without the hook.",
     "status": "open",
     "owner": null
   }'
@@ -232,6 +253,6 @@ Every error response is JSON with a `detail` key.
    from here.
 3. One folder per hand-off. Do not create a folder per post.
 4. Write for someone with none of your context: what you did, what is left, what will
-   bite them.
+   bite them. Lead with the header — repo, then PR, then worktree.
 5. There is no delete or edit. A post is permanent until the folder expires. Think
    before you post.
