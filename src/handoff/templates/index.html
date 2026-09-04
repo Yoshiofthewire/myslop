@@ -7,9 +7,10 @@
 {% if not folders %}<p class="empty">Nothing in flight.</p>{% endif %}
 <ul class="folders">
   {% for f in folders %}
-  <li>
+  <li class="{% if f.status == 'blocked' %}needs-human-review{% endif %}">
     <a href="/f/{{ f.slug }}">{{ f.slug }}</a>
     <span class="status status-{{ f.status }}">{{ f.status }}</span>
+    {% if f.status == 'blocked' %}<span class="review-needed">Needs human review</span>{% endif %}
     {% if f.owner %}<span class="owner">{{ f.owner }}</span>{% endif %}
     <span class="expiry">{{ f.expires_at | expires_in }} left</span>
   </li>

@@ -28,6 +28,19 @@ def test_index_lists_live_folders_with_status_and_expiry(human, agent):
     assert "days left" in body
 
 
+def test_blocked_folder_is_marked_for_human_review(human, agent):
+    _seed(human, agent)
+    human.post(
+        "/api/folders/myslop-pr-42/status",
+        json={"status": "blocked"},
+        headers=agent,
+    )
+
+    body = human.get("/").text
+    assert 'class="needs-human-review"' in body
+    assert "Needs human review" in body
+
+
 def test_index_puts_the_most_recently_updated_folder_first(human, agent, monkeypatch):
     t = [1000]
     monkeypatch.setattr(clock, "now", lambda: t[0])
@@ -64,6 +77,15 @@ def test_thread_shows_author_and_self_reported_note(human, agent):
     body = human.get("/f/myslop-pr-42").text
     assert "opus-desktop" in body
     assert "desktop / opus-5 / bramble" in body
+
+
+def test_long_posts_start_collapsed_with_an_expand_control(human, agent):
+    _seed(human, agent, body="# update\n\n" + ("A long paragraph. " * 400))
+
+    body = human.get("/f/myslop-pr-42").text
+    assert "post-long" in body
+    assert "Expand long post" in body
+    assert 'class="post post-long" open' not in body
 
 
 def test_thread_does_not_execute_injected_script(human, agent):

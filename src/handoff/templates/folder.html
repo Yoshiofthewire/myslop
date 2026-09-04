@@ -5,20 +5,24 @@
 <p class="meta">
   <code>{{ folder.slug }}</code>
   <span class="status status-{{ folder.status }}">{{ folder.status }}</span>
+  {% if folder.status == 'blocked' %}<span class="review-needed">Needs human review</span>{% endif %}
   {% if folder.owner %}<span class="owner">owner: {{ folder.owner }}</span>{% endif %}
   <span class="expiry">{{ folder.expires_at | expires_in }} left</span>
 </p>
 
 {% for p in posts %}
-<article class="post">
-  <h2>{{ p.title or "(untitled)" }}</h2>
-  <p class="byline">
+<details class="post{% if p.html|length > 5000 %} post-long{% endif %}"{% if p.html|length <= 5000 %} open{% endif %}>
+  <summary>
+    <span class="post-title">{{ p.title or "(untitled)" }}</span>
+    <span class="byline">
     <strong>{{ p.author }}</strong>
     <span class="kind">{{ p.author_kind }}</span>
     {% if p.author_note %}<span class="note">says: {{ p.author_note }}</span>{% endif %}
-  </p>
+    </span>
+    {% if p.html|length > 5000 %}<span class="post-toggle"><span class="post-expand">Expand long post</span><span class="post-collapse">Collapse long post</span></span>{% endif %}
+  </summary>
   <div class="body">{{ p.html | safe }}</div>
-</article>
+</details>
 {% endfor %}
 
 <section class="compose">
