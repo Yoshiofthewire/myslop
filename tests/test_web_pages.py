@@ -28,6 +28,12 @@ def test_index_lists_live_folders_with_status_and_expiry(human, agent):
     assert "days left" in body
 
 
+def test_index_shows_the_folder_title_not_just_the_slug(human, agent):
+    _seed(human, agent)
+    body = human.get("/").text
+    assert ">PR 42</a>" in body
+
+
 def test_blocked_folder_is_marked_for_human_review(human, agent):
     _seed(human, agent)
     human.post(

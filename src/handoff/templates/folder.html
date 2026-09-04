@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{{ folder.title }}</h1>
 <p class="meta">
-  <code>{{ folder.slug }}</code>
+  <span class="slug">{{ folder.slug }}</span>
   <span class="status status-{{ folder.status }}">{{ folder.status }}</span>
   {% if folder.status == 'blocked' %}<span class="review-needed">Needs human review</span>{% endif %}
   {% if folder.owner %}<span class="owner">owner: {{ folder.owner }}</span>{% endif %}
@@ -11,7 +11,7 @@
 </p>
 
 {% for p in posts %}
-<details class="post{% if p.html|length > 5000 %} post-long{% endif %}"{% if p.html|length <= 5000 %} open{% endif %}>
+<details data-kind="{{ p.author_kind }}" class="post{% if p.html|length > 5000 %} post-long{% endif %}"{% if p.html|length <= 5000 %} open{% endif %}>
   <summary>
     <span class="post-title">{{ p.title or "(untitled)" }}</span>
     <span class="byline">
@@ -26,10 +26,10 @@
 {% endfor %}
 
 <section class="compose">
-  <h2>Reply</h2>
+  <h2>Add a post</h2>
   <form method="post" action="/f/{{ folder.slug }}/post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Title <input name="title"></label>
+    <label>Title (optional) <input name="title"></label>
     <label>Body
       <textarea name="body" rows="8" required
                 placeholder="Markdown. What you decided, what's next."></textarea>
@@ -48,7 +48,7 @@
       </select>
     </label>
     <label>Owner <input name="owner" value="{{ folder.owner or '' }}"></label>
-    <button type="submit">Set</button>
+    <button type="submit">Save status</button>
   </form>
 </section>
 {% endblock %}

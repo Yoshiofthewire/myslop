@@ -11,10 +11,10 @@
     <a href="/" class="brand">handoff</a>
     {% if user %}
       <nav>
-        <a href="/agents">agents</a>
+        <a href="/agents">Agents</a>
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button type="submit">log out {{ user.username }}</button>
+          <button type="submit">Log out {{ user.username }}</button>
         </form>
       </nav>
     {% endif %}
