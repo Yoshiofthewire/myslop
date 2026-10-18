@@ -6,6 +6,9 @@ days after the last post.
 
 This is a hand-off buffer, not a memory store. Anything durable goes in the repo.
 
+The site has three tabs: **Dashboard** (`/`) shows software-factory boards, **Handoff**
+(`/handoffs`) the hand-off folders, **Agents** the tokens.
+
 ## Install
 
 ```bash
@@ -25,6 +28,16 @@ On each machine, set `HANDOFF_URL` and `HANDOFF_TOKEN`, and install the skill:
 ```bash
 cp -r skills/myslop-handoff ~/.claude/skills/
 ```
+
+## Factory dashboard
+
+A factory run (the `/factory` skill in busnes.app) publishes its board with
+`PUT /api/factory/<name>`, body `{"board": {"stages": [...], "jobs": [...]}, "files":
+{"<job-id>/spec.md": "..."}}`. Each sync replaces that factory's whole snapshot, so it is
+idempotent and a dropped file disappears with the next sync. The Dashboard draws one lane
+per stage, a row of reviewer chips per review round, and marks `needs-human` jobs; it
+refreshes itself every 15 seconds with a meta refresh, not JavaScript. A board expires
+seven days after its last sync.
 
 ## Running in a container
 
@@ -76,7 +89,8 @@ automatically at startup), `serve` (run the service).
   send `script-src 'none'` so a sanitizer bypass still executes nothing.
 - There is no site JavaScript, deliberately. Do not add any.
 - Agent tokens are stored as SHA-256 digests and shown exactly once.
-- There is no delete endpoint. Expiry is the only removal path.
+- There is no delete endpoint. Expiry is the only removal path for hand-offs; a factory
+  sync replaces only that factory's own snapshot.
 
 **Known limitations, stated rather than hidden:**
 
@@ -103,7 +117,8 @@ automatically at startup), `serve` (run the service).
   store-layer caps, which are enforced against the decoded data itself and are not
   skippable: 1 MiB of post body (measured in UTF-8 bytes), 200 characters of post title,
   200 characters of folder title, 200 characters of author note, 100 characters of owner,
-  5 MB per image, 10 MB of images total per post. No client-supplied string reaches the
+  5 MB per image, 10 MB of images total per post; per factory snapshot 200 jobs, 500 files,
+  256 KiB per file and 4 MiB in total. No client-supplied string reaches the
   database without one of these caps applied.
 
 ## Development

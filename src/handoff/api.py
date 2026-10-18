@@ -63,6 +63,25 @@ class StatusUpdate(BaseModel):
     owner: str | None = None
 
 
+class FactoryJob(BaseModel):
+    id: str
+    title: str = ""
+    repo: str = ""
+    branch: str = ""
+    stage: str
+    reviews: list[dict[str, str]] = Field(default_factory=list)
+
+
+class FactoryBoard(BaseModel):
+    stages: list[str]
+    jobs: list[FactoryJob]
+
+
+class FactorySnapshot(BaseModel):
+    board: FactoryBoard
+    files: dict[str, str] = Field(default_factory=dict)
+
+
 def _folder_json(row: sqlite3.Row) -> dict:
     return {
         "slug": row["slug"],
@@ -179,3 +198,22 @@ def set_status(
         # A reap can land between set_status's commit and this read-back.
         raise store.NotFound(slug)
     return _folder_json(row)
+
+
+@router.put("/factory/{name}")
+def sync_factory(
+    name: str,
+    body: FactorySnapshot,
+    request: Request,
+    agent: sqlite3.Row = Depends(require_agent),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    store.sync_factory(
+        conn,
+        name,
+        body.board.stages,
+        [j.model_dump() for j in body.board.jobs],
+        body.files,
+        request.app.state.ttl_days,
+    )
+    return {"name": name, "jobs": len(body.board.jobs), "files": len(body.files)}

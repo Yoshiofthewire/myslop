@@ -63,6 +63,21 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS factories (
+  name       TEXT PRIMARY KEY,
+  board      TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS factory_files (
+  factory TEXT NOT NULL REFERENCES factories(name) ON DELETE CASCADE,
+  job     TEXT NOT NULL,
+  path    TEXT NOT NULL,
+  html    TEXT NOT NULL,
+  PRIMARY KEY (factory, job, path)
+);
 """
 
 
@@ -83,12 +98,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 
 def reap(conn: sqlite3.Connection) -> int:
-    """Delete folders whose sliding TTL has run out, and expired sessions along with
-    them. Safe to call any number of times. Returns the folder count only -- that's
-    the number the CLI and callers already key off of; sessions are cleaned up as a
-    side effect, not reported."""
+    """Delete folders and factory boards whose sliding TTL has run out, and expired
+    sessions along with them. Safe to call any number of times. Returns the folder
+    count only -- that's the number the CLI and callers already key off of; sessions
+    and boards are cleaned up as a side effect, not reported."""
     now = clock.now()
     cur = conn.execute("DELETE FROM folders WHERE expires_at <= ?", (now,))
+    conn.execute("DELETE FROM factories WHERE expires_at <= ?", (now,))
     conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
     conn.commit()
     if cur.rowcount:

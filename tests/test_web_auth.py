@@ -108,7 +108,7 @@ def test_no_page_contains_a_script_tag(human, agent):
         json={"format": "html", "body": "<script>alert(1)</script>"},
         headers=agent,
     )
-    for path in ["/login", "/", "/f/s", "/agents"]:
+    for path in ["/login", "/", "/handoffs", "/f/s", "/agents"]:
         assert "<script" not in human.get(path).text.lower()
 
 

@@ -1,5 +1,6 @@
 """Folder, post, and blob operations. The only module that writes application rows."""
 
+import json
 import re
 import secrets
 import sqlite3
@@ -223,3 +224,117 @@ def add_post(
             raise NotFound(slug) from exc
         raise
     return post_id
+
+
+# --- factory boards ------------------------------------------------------------------
+#
+# A factory run (busnes.app /factory) owns its board.json and job markdown files. It
+# replaces the whole snapshot on every sync, so a write is idempotent and the server never
+# merges state. Stage names come from the board itself: editing the loop needs no deploy.
+
+VERDICTS = ("pending", "PASS", "CHANGES")
+MAX_STAGES = 12
+MAX_JOBS = 200
+MAX_ROUNDS = 10
+MAX_REVIEWERS = 8
+MAX_FILES = 500
+MAX_FILE_BYTES = 256 * 1024
+MAX_SNAPSHOT_BYTES = 4 * 1024 * 1024
+
+# <job-id>/<name>.md or <job-id>/round-<n>/<name>.md, the layout factory/jobs/ uses.
+_FILE_RE = re.compile(
+    r"^([a-z0-9][a-z0-9-]{0,63})/((?:round-[0-9]{1,2}/)?[a-z0-9][a-z0-9-]{0,63}\.md)$"
+)
+
+
+def sync_factory(
+    conn: sqlite3.Connection,
+    name: str,
+    stages: list[str],
+    jobs: list[dict],
+    files: dict[str, str],
+    ttl_days: int,
+) -> None:
+    if not valid_slug(name):
+        raise Invalid(f"invalid factory name: {name!r}")
+    if not stages or len(stages) > MAX_STAGES or len(set(stages)) != len(stages):
+        raise Invalid(f"stages must be 1-{MAX_STAGES} distinct names")
+    for stage in stages:
+        if not valid_slug(stage):
+            raise Invalid(f"invalid stage: {stage!r}")
+    if len(jobs) > MAX_JOBS:
+        raise Invalid(f"more than {MAX_JOBS} jobs")
+    if len(files) > MAX_FILES:
+        raise Invalid(f"more than {MAX_FILES} files")
+
+    ids = set()
+    for job in jobs:
+        if not valid_slug(job["id"]) or job["id"] in ids:
+            raise Invalid(f"invalid or duplicate job id: {job['id']!r}")
+        ids.add(job["id"])
+        if job["stage"] not in stages:
+            raise Invalid(f"job {job['id']}: stage {job['stage']!r} is not in stages")
+        for field in ("title", "repo", "branch"):
+            if len(job[field]) > MAX_TITLE_CHARS:
+                raise Invalid(f"job {job['id']}: {field} exceeds {MAX_TITLE_CHARS} characters")
+        if len(job["reviews"]) > MAX_ROUNDS:
+            raise Invalid(f"job {job['id']}: more than {MAX_ROUNDS} rounds")
+        for chips in job["reviews"]:
+            if len(chips) > MAX_REVIEWERS:
+                raise Invalid(f"job {job['id']}: more than {MAX_REVIEWERS} reviewers")
+            for reviewer, verdict in chips.items():
+                if not valid_slug(reviewer) or verdict not in VERDICTS:
+                    raise Invalid(f"job {job['id']}: bad review {reviewer!r}: {verdict!r}")
+
+    rows = []
+    total = 0
+    for path, source in files.items():
+        m = _FILE_RE.fullmatch(path)
+        if m is None or m.group(1) not in ids:
+            raise Invalid(f"invalid file path: {path!r}")
+        size = len(source.encode("utf-8"))
+        if size > MAX_FILE_BYTES:
+            raise Invalid(f"{path} exceeds {MAX_FILE_BYTES} bytes")
+        total += size
+        rows.append((name, m.group(1), m.group(2), render(source, "md", {})))
+    if total > MAX_SNAPSHOT_BYTES:
+        raise Invalid(f"files exceed {MAX_SNAPSHOT_BYTES} bytes")
+
+    now = clock.now()
+    board = json.dumps({"stages": stages, "jobs": jobs})
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO factories (name, board, updated_at, expires_at)"
+            " VALUES (?, ?, ?, ?)",
+            (name, board, now, now + ttl_days * 86400),
+        )
+        conn.execute("DELETE FROM factory_files WHERE factory = ?", (name,))
+        conn.executemany("INSERT INTO factory_files VALUES (?, ?, ?, ?)", rows)
+
+
+def list_factories(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM factories WHERE expires_at > ? ORDER BY updated_at DESC, name",
+        (clock.now(),),
+    ).fetchall()
+    return [
+        {"name": r["name"], "updated_at": r["updated_at"], **json.loads(r["board"])} for r in rows
+    ]
+
+
+def get_factory_job(conn: sqlite3.Connection, name: str, job_id: str) -> tuple[dict, list] | None:
+    """The job's board entry and its rendered files, spec first and decision last."""
+    factory = next((f for f in list_factories(conn) if f["name"] == name), None)
+    job = factory and next((j for j in factory["jobs"] if j["id"] == job_id), None)
+    if job is None:
+        return None
+    files = conn.execute(
+        "SELECT path, html FROM factory_files WHERE factory = ? AND job = ?", (name, job_id)
+    ).fetchall()
+    order = {"spec.md": 0, "build.md": 1, "decision.md": 3}
+
+    def key(f: sqlite3.Row) -> tuple:
+        # round-10 after round-9, not after round-1.
+        return order.get(f["path"], 2), re.sub(r"\d+", lambda m: m[0].zfill(3), f["path"])
+
+    return job, sorted(files, key=key)

@@ -1,0 +1,9 @@
+{# One row per review round; a chip per reviewer. The glyph carries the verdict, colour only repeats it. #}
+{% for chips in job.reviews %}
+<span class="round">
+  <span class="round-n">R{{ loop.index }}</span>
+  {% for who, verdict in chips.items() %}
+  <span class="chip chip-{{ verdict | lower }}" title="{{ who }}: {{ verdict }}">{{ who }} {{ {"PASS": "✓", "CHANGES": "✗"}.get(verdict, "…") }}</span>
+  {% endfor %}
+</span>
+{% endfor %}
