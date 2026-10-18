@@ -22,7 +22,7 @@ def _seed(client, agent, slug="myslop-pr-42", body="# hello", images=None):
 
 def test_index_lists_live_folders_with_status_and_expiry(human, agent):
     _seed(human, agent)
-    body = human.get("/").text
+    body = human.get("/handoffs").text
     assert "myslop-pr-42" in body
     assert "open" in body
     assert "days left" in body
@@ -30,7 +30,7 @@ def test_index_lists_live_folders_with_status_and_expiry(human, agent):
 
 def test_index_shows_the_folder_title_not_just_the_slug(human, agent):
     _seed(human, agent)
-    body = human.get("/").text
+    body = human.get("/handoffs").text
     assert ">PR 42</a>" in body
 
 
@@ -42,7 +42,7 @@ def test_blocked_folder_is_marked_for_human_review(human, agent):
         headers=agent,
     )
 
-    body = human.get("/").text
+    body = human.get("/handoffs").text
     assert 'class="needs-human-review"' in body
     assert "Needs human review" in body
 
@@ -56,7 +56,7 @@ def test_index_puts_the_most_recently_updated_folder_first(human, agent, monkeyp
 
     # Match the hrefs, not the bare slugs: "folders" in the list's own class attribute
     # contains "older" and would make a substring check pass no matter the order.
-    body = human.get("/").text
+    body = human.get("/handoffs").text
     assert body.index("/f/newer") < body.index("/f/older")
     # The agent-facing list keeps expiry order, which is the opposite here.
     listed = [f["slug"] for f in human.get("/api/folders", headers=agent).json()]
@@ -69,7 +69,7 @@ def test_index_hides_expired_folders(human, agent, monkeypatch):
     _seed(human, agent)
 
     t[0] += 8 * DAY
-    assert "myslop-pr-42" not in human.get("/").text
+    assert "myslop-pr-42" not in human.get("/handoffs").text
 
 
 def test_thread_renders_markdown_as_html(human, agent):
@@ -110,6 +110,7 @@ def test_thread_does_not_execute_injected_script(human, agent):
 def test_index_and_thread_pages_are_not_cached(human, agent):
     _seed(human, agent)
     assert human.get("/").headers["cache-control"] == "no-store"
+    assert human.get("/handoffs").headers["cache-control"] == "no-store"
     assert human.get("/f/myslop-pr-42").headers["cache-control"] == "no-store"
 
 

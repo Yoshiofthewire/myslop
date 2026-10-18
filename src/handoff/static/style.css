@@ -670,6 +670,164 @@ button:hover {
   margin-bottom: 1.25rem;
 }
 
+/* --- dashboard --------------------------------------------------------- */
+
+/* The board is the one page that needs the width: one lane per stage. */
+body.wide {
+  max-width: 90rem;
+}
+
+header nav a.tab[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.factory {
+  margin-bottom: 3rem;
+}
+
+.factory h2 .row-meta {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.lanes {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(12rem, 1fr);
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  border-top: 2px solid var(--ink);
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+}
+
+.lane h3 {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.25rem;
+}
+
+.lane[data-stage="needs-human"] h3 {
+  color: var(--st-blocked);
+}
+
+.lane .count {
+  font-weight: 400;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+.card.needs-human-review {
+  border: 2px solid var(--st-blocked);
+  background: color-mix(in srgb, var(--st-blocked) 7%, var(--paper));
+}
+
+.card-title {
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0 0 2rem;
+}
+
+.meta .mono {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.round-n,
+.chip,
+.stage {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.round-n {
+  color: var(--muted);
+  min-width: 1.6rem;
+}
+
+.chip {
+  --c: var(--muted);
+  padding: 0 0.4rem;
+  border: 1px solid var(--c);
+  border-radius: 1rem;
+  color: var(--c);
+}
+
+.chip-pass {
+  --c: var(--st-open);
+}
+
+.chip-changes {
+  --c: var(--st-blocked);
+  font-weight: 600;
+}
+
+.chip-pending {
+  border-style: dashed;
+}
+
+.stage {
+  font-weight: 600;
+  color: var(--st-claimed);
+}
+
+.stage[data-stage="needs-human"] {
+  color: var(--st-blocked);
+}
+
+.stage[data-stage="merged"] {
+  color: var(--st-open);
+}
+
+p.callout {
+  white-space: normal;
+  border-left: 3px solid currentColor;
+  padding: 0.15rem 0 0.15rem 0.75rem;
+  margin: 0 0 1.5rem;
+}
+
 /* --- narrow screens ---------------------------------------------------- */
 
 @media (max-width: 34rem) {

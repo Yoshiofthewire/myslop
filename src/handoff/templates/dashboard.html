@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block head %}<meta http-equiv="refresh" content="15">{% endblock %}
+{% block title %}dashboard{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+{% if not factories %}<p class="empty">No factory has synced yet. Run <code>/factory</code> and its board shows up here.</p>{% endif %}
+{% for f in factories %}
+<section class="factory">
+  <h2>{{ f.name }} <span class="row-meta">synced {{ f.updated_at | ago }} ago</span></h2>
+  {% set waiting = f.jobs | selectattr("stage", "equalto", "needs-human") | list %}
+  {% if waiting %}<p class="review-needed">{{ waiting | length }} job{{ '' if waiting | length == 1 else 's' }} need{{ 's' if waiting | length == 1 else '' }} a human</p>{% endif %}
+  <div class="lanes">
+    {% for stage in f.stages %}
+    {% set cards = f.jobs | selectattr("stage", "equalto", stage) | list %}
+    <div class="lane" data-stage="{{ stage }}">
+      <h3>{{ stage }} <span class="count">{{ cards | length }}</span></h3>
+      {% for job in cards %}
+      <a class="card{% if stage == 'needs-human' %} needs-human-review{% endif %}" href="/factory/{{ f.name }}/{{ job.id }}">
+        <span class="card-title">{{ job.title or job.id }}</span>
+        <span class="slug">{{ job.id }}{% if job.repo %} · {{ job.repo }}{% endif %}</span>
+        {% include "_chips.html" %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

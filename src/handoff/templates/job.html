@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ job.id }}{% endblock %}
+{% block content %}
+<p class="meta"><a href="/">← {{ factory }}</a></p>
+<h1>{{ job.title or job.id }}</h1>
+<p class="meta">
+  <span class="slug">{{ job.id }}</span>
+  <span class="stage" data-stage="{{ job.stage }}">{{ job.stage }}</span>
+  {% if job.repo %}<span class="mono">{{ job.repo }}</span>{% endif %}
+  {% if job.branch %}<span class="mono">{{ job.branch }}</span>{% endif %}
+</p>
+{% if job.stage == 'needs-human' %}
+<p class="callout review-needed">Needs a human: <code>/factory approve {{ job.id }}</code> or <code>/factory rework {{ job.id }} &lt;note&gt;</code></p>
+{% endif %}
+{% if job.reviews %}<p class="rounds">{% include "_chips.html" %}</p>{% endif %}
+
+{% if not files %}<p class="empty">No files yet.</p>{% endif %}
+{% for f in files %}
+<details class="post{% if f.html|length > 5000 %} post-long{% endif %}"{% if f.html|length <= 5000 %} open{% endif %}>
+  <summary>
+    <span class="post-title mono">{{ f.path }}</span>
+    {% if f.html|length > 5000 %}<span class="post-toggle"><span class="post-expand">Expand</span><span class="post-collapse">Collapse</span></span>{% endif %}
+  </summary>
+  <div class="body">{{ f.html | safe }}</div>
+</details>
+{% endfor %}
+{% endblock %}

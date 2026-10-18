@@ -105,8 +105,8 @@ def logout(
     return response
 
 
-def _expires_in(expires_at: int) -> str:
-    seconds = max(0, expires_at - clock.now())
+def _duration(seconds: int) -> str:
+    seconds = max(0, seconds)
     days, rem = divmod(seconds, 86400)
     if days:
         return f"{days} day{'s' if days != 1 else ''}"
@@ -119,10 +119,60 @@ def _expires_in(expires_at: int) -> str:
     return "under a minute"
 
 
+def _expires_in(expires_at: int) -> str:
+    return _duration(expires_at - clock.now())
+
+
+def _ago(at: int) -> str:
+    return _duration(clock.now() - at)
+
+
 templates.env.filters["expires_in"] = _expires_in
+templates.env.filters["ago"] = _ago
 
 
 @router.get("/")
+def dashboard(
+    request: Request,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    db.reap(conn)
+    return page(
+        request,
+        "dashboard.html",
+        user=user,
+        no_store=True,
+        tab="dashboard",
+        factories=store.list_factories(conn),
+    )
+
+
+@router.get("/factory/{name}/{job_id}")
+def factory_job(
+    name: str,
+    job_id: str,
+    request: Request,
+    user: sqlite3.Row = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    found = store.get_factory_job(conn, name, job_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="no such job")
+    job, files = found
+    return page(
+        request,
+        "job.html",
+        user=user,
+        no_store=True,
+        tab="dashboard",
+        factory=name,
+        job=job,
+        files=files,
+    )
+
+
+@router.get("/handoffs")
 def index(
     request: Request,
     user: sqlite3.Row = Depends(require_user),
@@ -134,6 +184,7 @@ def index(
         "index.html",
         user=user,
         no_store=True,
+        tab="handoff",
         # Newest activity first: the human wants what moved, not what dies first.
         # The API keeps store.list_folders' expiry order.
         folders=sorted(store.list_folders(conn), key=lambda f: f["last_post_at"], reverse=True),
@@ -156,6 +207,7 @@ def folder_page(
         "folder.html",
         user=user,
         no_store=True,
+        tab="handoff",
         folder=folder,
         posts=store.list_posts(conn, slug),
         statuses=store.STATUSES,
@@ -233,6 +285,7 @@ def agents_page(
         request,
         "agents.html",
         user=user,
+        tab="agents",
         agents=auth.list_agents(conn),
         new_token=None,
         new_name=None,
@@ -256,6 +309,7 @@ def mint_agent(
             request,
             "agents.html",
             user=user,
+            tab="agents",
             agents=auth.list_agents(conn),
             new_token=None,
             new_name=None,
@@ -265,6 +319,7 @@ def mint_agent(
         request,
         "agents.html",
         user=user,
+        tab="agents",
         agents=auth.list_agents(conn),
         new_token=token,
         new_name=name,
